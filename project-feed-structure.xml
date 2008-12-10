@@ -1,0 +1,32 @@
+<project>
+  <title>Content Construction Kit (CCK)</title>
+  <short_name>cck</short_name>
+  <dc:creator>JonBob</dc:creator>
+  <api_version>6.x</api_version>
+  <recommended_major>2</recommended_major>
+  <supported_majors>2</supported_majors>
+  <default_major>2</default_major>
+  <project_status>published</project_status>
+  <link>http://drupal.org/project/cck</link>
+  <terms>...</terms>
+  <releases>...</releases>
+</project>
+  
+<release>
+  <name>cck 6.x-2.1</name>
+  <version>6.x-2.1</version>
+  <tag>DRUPAL-6--2-1</tag>
+  <version_major>2</version_major>
+  <version_patch>1</version_patch>
+  <status>published</status>
+  <release_link>http://drupal.org/node/333173</release_link>
+  <download_link>http://ftp.drupal.org/files/projects/cck-6.x-2.1.tar.gz</download_link>
+  <date>1226449204</date>
+  <mdhash>6036acde1dbc0bad62681de5f94bc912</mdhash>
+  <terms>...</terms>
+</release>
+
+<term>
+  <name>Release type</name>
+  <value>Bug fixes</value>
+</term>
