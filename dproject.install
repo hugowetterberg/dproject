@@ -1,0 +1,124 @@
+<?php
+/**
+ * Contains implementation install, uninstall and schema hooks for dproject.
+ *
+ * @version $Id$
+ **/
+
+/**
+ * Implementation of hook_install
+ **/
+function dproject_install() {
+  drupal_install_schema('dproject');
+}
+
+/**
+ * Implementation of hook_install
+ **/
+function dproject_uninstall() {
+  drupal_uninstall_schema('dproject');
+}
+
+/**
+ * Implementation of hook_install
+ *
+ * @return array
+ *  The database schema for dproject
+ **/
+function dproject_schema() {
+  $schema = array();
+  
+  $schema['dproject'] = array(
+    'description' => t('Project information'),
+    'fields' => array(
+      'pnid' => array(
+        'description' => t('The project node id.'),
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'short_name' => array(
+        'description' => t('The short project name'),
+        'type' => 'varchar',
+        'length' => 64,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+    ),
+  );
+  
+  $schema['dproject_release'] = array(
+    'description' => t('Project release information'),
+    'fields' => array(
+      'rid' => array(
+        'description' => t('The project release id.'),
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'project_nid' => array(
+        'description' => t('The project node id.'),
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'api_version' => array(
+        'description' => t('The supported Drupal version'),
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 6,
+      ),
+      'major_version' => array(
+        'description' => t('The major release version'),
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 1,
+      ),
+      'minor_version' => array(
+        'description' => t('The major release version'),
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'version_extra' => array(
+        'description' => t('Extra version information'),
+        'type' => 'varchar',
+        'length' => 32,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'status' => array(
+        'description' => t('The status of the release'),
+        'type' => 'varchar',
+        'length' => 32,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'file_path' => array(
+        'description' => t('The path to the release file'),
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'md5' => array(
+        'description' => t('The md5 hash of the release file'),
+        'type' => 'varchar',
+        'length' => 32,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'release_metadata' => array(
+        'description' => t('Metadata describing the release encoded as json'),
+        'type' => 'text',
+        'size' => 'big',
+      ),
+    ),
+    'indexes' => array()
+  );
+  
+  return $schema;
+}

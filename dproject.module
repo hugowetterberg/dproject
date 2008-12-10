@@ -1,0 +1,63 @@
+<?php
+/**
+ * dproject module.
+ *
+ * @version $Id$
+ **/
+
+require_once('dproject.inc');
+
+/**
+ * Implementation of hook_node_info
+ *
+ * @return array The node types declared by dproject
+ **/
+function dproject_node_info() {
+  return array(
+    'dproject' => array(
+      'name' => t('Project'),
+      'description' => t('A Drupal project, ordinarily a module or theme'),
+      'module' => 'dproject',
+      'title_label' => t('Name'),
+      'body_label' => t('Description'),
+      'min_word_count' => 50,
+    ),
+  );
+}
+
+/**
+ * Implementation of hook_form
+ *
+ * @return array The edit or create form for the node
+ **/
+function dproject_form(&$node, $form_state) {
+  $type = node_get_types('type', $node);
+
+  if ($type->has_title) {
+    $form['title'] = array(
+      '#type' => 'textfield',
+      '#title' => check_plain($type->title_label),
+      '#required' => TRUE,
+      '#default_value' => $node->title,
+      '#weight' => -5,
+    );
+  }
+
+  if ($type->has_body) {
+    $form['body_field'] = node_body_field($node, $type->body_label, $type->min_word_count);
+  }
+  
+  $form['short_name'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Short project name'),
+    '#required' => TRUE,
+    '#weight' => -4,
+    '#default_value' => '',
+  );
+  
+  if (module_exists('content')) {
+    $form['areas']['#weight'] = content_extra_field_weight('city', 'areas');
+  }
+
+  return $form;
+}
