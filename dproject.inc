@@ -26,8 +26,8 @@ class DProjectRelease {
   public $status = 'supported'; // supported, recommended or unsupported
   
   private $tmp_file = FALSE;
-  private $file_path = '',
-  private $md5 = '',
+  private $file_path = '';
+  private $md5 = '';
   private $metadata = array();
 
   /**
@@ -214,6 +214,10 @@ class DProjectRelease {
       // Rethrow the exception
       throw $e;
     }
+  }
+  
+  private function save() {
+    
   }
   
   /**

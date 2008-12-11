@@ -1,0 +1,6 @@
+; $Id$
+name = "Git integration"
+version = "6.x-0.1"
+core = "6.x"
+description = "Git integration for the distributed project module"
+package = "Project"

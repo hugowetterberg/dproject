@@ -19,8 +19,7 @@ function dproject_node_info() {
       'description' => t('A Drupal project, ordinarily a module or theme'),
       'module' => 'dproject',
       'title_label' => t('Name'),
-      'body_label' => t('Description'),
-      'min_word_count' => 50,
+      'body_label' => t('Extra description'),
     ),
   );
 }
@@ -43,21 +42,75 @@ function dproject_form(&$node, $form_state) {
     );
   }
 
-  if ($type->has_body) {
-    $form['body_field'] = node_body_field($node, $type->body_label, $type->min_word_count);
-  }
-  
   $form['short_name'] = array(
     '#type' => 'textfield',
     '#title' => t('Short project name'),
     '#required' => TRUE,
     '#weight' => -4,
-    '#default_value' => '',
+    '#default_value' => $node->short_name,
   );
-  
+
+  $form['description'] = array(
+    '#type' => 'textarea',
+    '#title' => t('Project description'),
+    '#required' => TRUE,
+    '#weight' => -3,
+    '#default_value' => $node->description,
+  );
+
+  if ($type->has_body) {
+    $form['body_field'] = node_body_field($node, $type->body_label, $type->min_word_count);
+  }
+
   if (module_exists('content')) {
-    $form['areas']['#weight'] = content_extra_field_weight('city', 'areas');
+    $form['short_name']['#weight'] = content_extra_field_weight('dproject', 'short_name');
+    $form['description']['#weight'] = content_extra_field_weight('dproject', 'description');
   }
 
   return $form;
+}
+
+function dproject_nodeapi($node, $op, $form) {
+  if ($node->type=='dproject') {
+    switch($op) {
+      case 'load':
+        $res = db_query("SELECT short_name, description FROM {dproject} WHERE nid=%d", array(
+          ':nid' => $node->nid,
+        ));
+        if ($a = db_fetch_array($res)) {
+          foreach($a as $name => $val) {
+            $node->$name = $val;
+          }
+        }
+      case 'validate':
+        if (!preg_match('/^[a-z_0..9]+$/', $node->short_name)) {
+          form_set_error('short_name', t('The short name can only contain lowercase letters (a-z), underscores and numbers'), 'error');
+        }
+        // Check for duplicate names
+        $eres = db_query("SELECT COUNT(*) AS name_exists FROM {dproject} WHERE short_name='%s'", array(
+          ':short_name' => $node->short_name,
+        ));
+        if ($eo = db_fetch_object($eres) && $eo->name_exists) {
+          form_set_error('short_name', t('The short must be unique'), 'error');
+        }
+        
+        // TODO: Central server check for duplicate names?
+      break;
+      case 'delete':
+        // Clean up project information
+        db_query('DELETE FROM {dproject} WHERE nid=%d', array(
+          ':nid' => $node->nid,
+        ));
+      break;
+      case 'update':
+      case 'insert':
+        $values = array(
+          'nid' => $node->nid,
+          'short_name' => $node->short_name,
+          'description' => $node->description,
+        );
+        drupal_write_record('dproject', $values, $op=='update'?'nid':NULL);
+      break;
+    }
+  }
 }
