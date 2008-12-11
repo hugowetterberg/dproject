@@ -31,7 +31,7 @@ function dproject_schema() {
   $schema['dproject'] = array(
     'description' => t('Project information'),
     'fields' => array(
-      'pnid' => array(
+      'nid' => array(
         'description' => t('The project node id.'),
         'type' => 'int',
         'unsigned' => TRUE,
@@ -44,6 +44,15 @@ function dproject_schema() {
         'not null' => TRUE,
         'default' => '',
       ),
+      'description' => array(
+        'description' => t('Project description'),
+        'type' => 'text',
+        'size' => 'big',
+      ),
+    ),
+    'primary key' => array('nid'),
+    'unique keys' => array(
+      'short_name' => array('short_name')
     ),
   );
   
@@ -117,7 +126,12 @@ function dproject_schema() {
         'size' => 'big',
       ),
     ),
-    'indexes' => array()
+    'indexes' => array(
+      'project' => array('project_nid'),
+      'version' => array('api_version', 'major_version', 'minor_version', 'version_extra'),
+      'status' => array('status'),
+    ),
+    'primary key' => array('rid'),
   );
   
   return $schema;
