@@ -1,2 +1,28 @@
 <?php
 // $Id$
+
+function dpgit_requirements($phase) {
+  $requirements = array();
+  $t = get_t();
+  
+  if ($phase=='runtime') {
+    $out = array();
+    $return = 0;
+    exec('git --version', $out, $return);
+    
+    $requirements['git'] = array(
+      'title' => $t('Git version'),
+    );
+      
+    if (empty($out) || $return) {
+      $requirements['git']['description'] = $t('Git is not installed on your system or it\'s not on your path');
+      $requirements['git']['severity'] = REQUIREMENT_ERROR;
+    }
+    else {
+      $requirements['git']['value'] = $out[0];
+      $requirements['git']['severity'] = REQUIREMENT_OK;
+    }
+  }
+  
+  return $requirements;
+}
