@@ -19,9 +19,13 @@ function dpgit_dproject_packager() {
           'title' => t('Tags'),
           'callback' => '_dpgit_tags',
         ),
+        'recent_commits' => array(
+          'title' => t('Recent commits'),
+          'callback' => '_dpgit_recent_commits',
+        )
       ),
     ),
-  )
+  );
 }
 
 function _dpgit_configure_source() {
@@ -34,6 +38,10 @@ function _dpgit_configure_source() {
 }
 
 function _dpgit_select_branch_commit($branch) {
+  
+}
+
+function _dpgit_recent_commits() {
   
 }
 
