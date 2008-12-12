@@ -33,14 +33,131 @@ function _dpgit_configure_source() {
   return $form; 
 }
 
-function _dpgit_branches() {
-  exec()
-}
-
 function _dpgit_select_branch_commit($branch) {
   
 }
 
-function _dpgit_tags($branch) {
+/**
+ * Lists the available (remote) branches in a repository
+ *
+ * @param string $repository
+ *  The path to the git repository
+ *
+ * @return array(string) An array with the names of the branches
+ **/
+function _dpgit_branches($repository) {
+  $branches = array();
+  $out = shell_exec('git --git-dir="' . $repository . '/.git" branch -r --no-color');
   
+  foreach (split("\n", $out) as $line) {
+    if (!empty($line)) {
+      $branches[] = trim($line);
+    }
+  }
+  
+  return $branches;
+}
+
+/**
+ * Gets the commit log as a associative arrayed keyed to the sha1 of the commit
+ * 
+ * Structure:
+ * array(
+ *  [sha1] => array(
+ *    'author'  => [name <email>],
+ *    'date'    => [iso date-time],
+ *    'message' => [commit message],
+ *    'files'   => array(
+ *      [file] => [status],
+ *      ...
+ *    )
+ *  ),
+ *  ...
+ * )
+ *
+ * @param string $repository
+ *  The path to the git repository
+ * @param int $commits
+ *  The number of log entries to return. Use 0 to get the full log.
+ *  Defaults to 10.
+ * @param string $file
+ *  The path to get the log for (relative to the repository root)
+ *  Defaults to '.'
+ *
+ * @return array
+ *  The commit log as a associative arrayed keyed to the sha1 of the commit
+ **/
+function _dpgit_log($repository, $commits=10, $file='.') {
+  $out = array();
+  $retval = 0;
+  
+  // Create a -<n> flag if we should limit the number of log messages to fetch
+  $n_flag = '';
+  if ($commits) {
+    $n_flag = '-' . $commits;
+  }
+  
+  // We can't use exec as it doesn't preserve trailing whitespace and we need 
+  // that to differentiate between empty lines in the commit messages and empty
+  // lines separating header, commit message and file listing.
+  $out = shell_exec('git --git-dir="' . $repository . '/.git" log ' . $n_flag . ' --no-color --date=iso --name-status -- .');
+  $out = split("\n", $out);
+  
+  $log = array();
+  $lines = count($out);
+  for ($i=0; $i<$lines; $i++) {
+    $sha = substr($out[$i], 7); 
+    $info = array();
+    
+    // Parse the header
+    $i++;
+    $match = array();
+    while(!empty($out[$i]) && preg_match('/^([^:]+):\s*(.+)$/', $out[$i], $match)) {
+      $info[strtolower($match[1])] = $match[2];
+      $i++;
+    }
+    
+    // Extract the commit message
+    $i++;
+    $message = '';
+    while(!empty($out[$i])) {
+      $message .= trim($out[$i]) . "\n";
+      $i++;
+    }
+    $info['message'] = $message;
+    
+    // Get info about changes
+    $i++;
+    $files = array();
+    while(!empty($out[$i])) {
+      $files[substr($out[$i],2)] = substr($out[$i], 0, 1);
+      $i++;
+    }
+    $info['files'] = $files;
+    
+    $log[$sha] = $info;
+  }
+  
+  return $log;
+}
+
+/**
+ * Lists the available tags in a repository
+ *
+ * @param string $repository
+ *  The path to the git repository
+ *
+ * @return array(string) An array with the names of the tags
+ **/
+function _dpgit_tags($repository) {
+  $tags = array();
+  $out = shell_exec('git --git-dir="' . $repository . '/.git" tag -l');
+  
+  foreach (split("\n", $out) as $line) {
+    if (!empty($line)) {
+      $tags[] = trim($line);
+    }
+  }
+  
+  return $tags;
 }
