@@ -9,6 +9,11 @@
  * Implementation of hook_install
  **/
 function dproject_install() {
+  // Make sure that we get the correct path for our projects if pathauto
+  // is or will be installed.
+  variable_set('pathauto_node_dproject_pattern', 'project/[short-name]');
+  
+  // Install schema
   drupal_install_schema('dproject');
 }
 
@@ -16,11 +21,12 @@ function dproject_install() {
  * Implementation of hook_install
  **/
 function dproject_uninstall() {
+  // Uninstall schema
   drupal_uninstall_schema('dproject');
 }
 
 /**
- * Implementation of hook_install
+ * Implementation of hook_schema
  *
  * @return array
  *  The database schema for dproject
@@ -53,6 +59,41 @@ function dproject_schema() {
     'primary key' => array('nid'),
     'unique keys' => array(
       'short_name' => array('short_name')
+    ),
+  );
+  
+  $schema['dproject_packager'] = array(
+    'description' => t('Project packager information'),
+    'fields' => array(
+      'pid' => array(
+        'description' => t('The project packager id.'),
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'nid' => array(
+        'description' => t('The project node id.'),
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'packager' => array(
+        'description' => t('The packager type'),
+        'type' => 'varchar',
+        'length' => 64,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'configuration' => array(
+        'description' => t('Packager configuration'),
+        'type' => 'text',
+        'size' => 'big',
+      ),
+    ),
+    'primary key' => array('pid'),
+    'indexes' => array(
+      'project' => array('nid'),
+      'packager' => array('packager'),
     ),
   );
   
