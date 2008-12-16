@@ -4,11 +4,15 @@
 function dpgit_dproject_packager() {
   return array(
     'git' => array(
-      'type' => 'cvs',
+      'title' => t('Git'),
+      'type' => 'dcvs',
       'configuration form' => '_dpgit_configure_source',
-      'configuration submit' => '_dpgit_configure_source',
+      'configuration submit' => '_dpgit_configure_source_submit',
       'update callback' => '_dpgit_pull',
       'package callback' => '_dpgit_package',
+      'description callback' => '_dpgit_description',
+      'packager created' => '_dpgit_created',
+      'packager deleted' => '_dpgit_deleted',
       'sources' => array(
         'branches' => array(
           'title' => t('Branches'),
@@ -32,9 +36,20 @@ function _dpgit_configure_source() {
   $form = array();
   $form['git_source'] = array(
     '#type' => 'textfield',
+    '#required' => TRUE,
     '#title' => t('The url or path to the git repository'),
   );
   return $form; 
+}
+
+function _dpgit_configure_source_submit($values) {
+  return array(
+    'url' => $values['git_source'],
+  );
+}
+
+function _dpgit_description($packager) {
+  return $packager->configuration->url;
 }
 
 function _dpgit_select_branch_commit($branch) {

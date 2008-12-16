@@ -6,6 +6,8 @@
  **/
 
 require_once('dproject.inc');
+require_once('dproject.api.inc');
+require_once('dproject.token.inc');
 
 /**
  * Implementation of hook_node_info
@@ -22,6 +24,168 @@ function dproject_node_info() {
       'body_label' => t('Extra description'),
     ),
   );
+}
+
+function dproject_menu() {
+  $items = array();
+  
+  $items['dproject/ahah/packager_configuration'] = array(
+    'page callback' => '_dproject_ahah_packager_configuration',
+    'access arguments' => array('access content'),
+    'type' => MENUITEM_CALLBACK,
+  );
+
+  $items['project/%/packagers'] = array(
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('_dproject_project_packagers', 1),
+    'access callback' => '_dproject_access',
+    'access arguments' => array('update', 1),
+    'type' => MENUITEM_CALLBACK,
+  );
+
+  $items['project/%/delete-packager/%'] = array(
+    'title' => t('Delete project packager'),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('_dproject_delete_project_packager', 1, 3),
+    'access callback' => '_dproject_access',
+    'access arguments' => array('update', 1),
+    'type' => MENUITEM_CALLBACK,
+  );
+
+  return $items;
+}
+
+function _dproject_access($op, $short_name) {
+  $node = dproject_get_project_by_name($short_name);
+  if ($node) {
+    return node_access($op, $node);
+  }
+  return FALSE;
+}
+
+function _dproject_project_packagers($form_state, $short_name) {
+  $node = dproject_get_project_by_name($short_name);
+  if ($node) {
+    drupal_set_title(t('Packagers for !name', array(
+      '!name' => $node->title,
+    )));
+
+    $packagers = dproject_get_packager_types();
+    $pack_options = array(
+      '' => t('--Select a packager')
+    );
+    foreach ($packagers as $name => $def) {
+      $pack_options[$name] = $def['title'];
+    }
+
+    $pp = dproject_get_project_packagers($node->nid);
+    $po = '<ul>';
+    foreach ($pp as $p) {
+      $po .= '<li><label>' . $p->packager . '</label>' . 
+        l(t('Remove'), 'project/' . $short_name . '/delete-packager/' . $p->pid, array(
+          'attributes' => array(
+            'class' => 'delete',
+          ),
+        ));
+      $po .= '<div class="packager-description">';
+      $po .= dproject_packager_description($p);
+      $po .= '</div></li>';
+    }
+    $po .= '</ul>';
+
+    $form = array(
+      '#submit' => array('_dproject_project_packagers_submit'),
+      'packagers' => array(
+        '#type' => 'markup',
+        '#value' => $po,
+      ),
+      'project' => array(
+        '#type' => 'value',
+        '#value' => $node->nid,
+      ),
+      'packager' => array(
+        '#type' => 'select',
+        '#title' => t('Add a packager'),
+        '#options' => $pack_options,
+        '#ahah' => array(
+          'path' => 'dproject/ahah/packager_configuration',
+          'wrapper' => 'packager-configuration',
+        ),
+      ),
+      'packager_configuration' => array(
+        '#type' => 'markup',
+        '#value' => '<div id="packager-configuration"></div>',
+      ),
+    );
+    return $form;
+  }
+  else {
+    drupal_not_found();
+  }
+}
+
+function _dproject_project_packagers_submit($form, $form_state) {
+  $values = $form_state['values'];
+  $packager = $values['packager'];
+  $packagers = dproject_get_packager_types();
+  if (isset($packagers[$packager]) && isset($packagers[$packager]['configuration submit'])) {
+    $configuration = call_user_func($packagers[$packager]['configuration submit'], $values);
+  }
+  else {
+    $configuration = array();
+  }
+  
+  $values = array(
+    'nid' => $values['project'],
+    'packager' => $packager,
+    'configuration' => json_encode($configuration),
+  );
+  drupal_write_record('dproject_packager', $values);
+}
+
+function _dproject_delete_project_packager($form_state, $project_name, $pid) {
+  $p = dproject_get_project_packager($pid);
+  if ($p) {
+    $out .= '<p>' . t('Do you really want to delete the !type project packager:', array(
+      '!type' => $p->packager,
+    )) . '</p>';
+    $out .= '<div class="packager-description">' . dproject_packager_description($p) . '</div>';
+    
+    return array(
+      '#submit' => array('_dproject_delete_project_packager_confirmed'),
+      'pid' => array(
+        '#type' => 'value',
+        '#value' => $p->pid,
+      ),
+      'confirm_text' => array(
+        '#type' => 'markup',
+        '#value' => $out,
+      ),
+      'cancel_link' => array(
+        '#type' => 'markup',
+        '#value' => l(t('No, cancel this action'), 'node/' . $p->nid),
+      ),
+      'submit' => array(
+        '#type' => 'submit',
+        '#value' => t('Yes, go ahead'),
+      ),
+    );
+  }
+  else {
+    drupal_not_found();
+  }
+}
+
+function _dproject_delete_project_packager_confirmed($form, $form_state) {
+  $pid = $form_state['values']['pid'];
+  $p = dproject_get_project_packager($pid);
+  if ($p) {
+    dproject_delete_project_packager($p);
+    drupal_goto('node/' . $p->nid);
+  }
+  else {
+    drupal_not_found();
+  }
 }
 
 /**
@@ -70,6 +234,83 @@ function dproject_form(&$node, $form_state) {
   return $form;
 }
 
+function _dproject_ahah_packager_configuration() {
+  $packager = $_POST['packager'];
+  _dproject_ahah_helper('packager_configuration', '_dproject_packager_configuration_form', $packager);
+}
+
+function _dproject_packager_configuration_form($packager, $configuration=array()) {
+  $packagers = dproject_get_packager_types();
+  if (isset($packagers[$packager]) && isset($packagers[$packager]['configuration form'])) {
+    $form = array();
+    $form['_conf'] = call_user_func($packagers[$packager]['configuration form']);
+    $form['submit'] = array(
+      '#type' => 'submit',
+      '#value' => t('Add'),
+    );
+    return $form;
+  }
+}
+
+function _dproject_packager_configuration_submit($packager, $configuration=array()) {
+  $packagers = dproject_get_packager_types();
+  if (isset($packagers[$packager]) && isset($packagers[$packager]['configuration submit'])) {
+    return call_user_func($packagers[$packager]['configuration submit']);
+  }
+}
+
+/**
+ * Helper function for implementing ahah page callbacks
+ *
+ * @param string $element 
+ *  The name of the form element, can also be a path like "ahah_config/name_field"
+ * @param string $form_callback 
+ *  The function to call to get the form array
+ * @return void
+ */
+function _dproject_ahah_helper($element, $form_callback/*, $arg1, $arg2 ...*/) {
+  $cached_form_state = array();
+  $cached_form = form_get_cache($_POST['form_build_id'], $cached_form_state);
+
+  // Resolve the parent of the element that is to be set
+  $element_path = split('/', $element);
+  $element = $element_path[count($element_path)-1];
+  $parent = &$cached_form;
+  for ($i=0; $i<count($element_path)-1; $i++) {
+    if (isset($parent[$element_path[$i]])) {
+      $parent = &$parent[$element_path[$i]];
+    }
+  }
+
+  $args = func_get_args();
+  array_shift($args); // Remove element
+  array_shift($args); // Remove callback
+
+  // Check if the callback is callable
+  if (is_callable($form_callback)) {
+    $set = call_user_func_array($form_callback, $args);
+  }
+  
+  if (empty($set)) {
+    $set = array(
+      '#value' => '<span></span>',
+    );
+  }
+
+  $parent[$element] = $set;
+  form_set_cache($_POST['form_build_id'], $cached_form, $cached_form_state);
+  $form_state = array('submitted' => FALSE);
+  $set = form_builder($form_callback, $set, $form_state);
+  $output = drupal_render($set);
+  print drupal_to_js(array('status' => TRUE, 'data' => $output));
+  exit;
+}
+
+
+
+/**
+ * Implementation of hook_nodeapi
+ */
 function dproject_nodeapi($node, $op, $form) {
   if ($node->type=='dproject') {
     switch($op) {
@@ -110,6 +351,12 @@ function dproject_nodeapi($node, $op, $form) {
           'description' => $node->description,
         );
         drupal_write_record('dproject', $values, $op=='update'?'nid':NULL);
+        if (module_exists('path')) {
+          path_set_alias('node/' . $node->nid, 'project/' . $node->short_name);
+        }
+      break;
+      case 'prepare':
+        
       break;
     }
   }
