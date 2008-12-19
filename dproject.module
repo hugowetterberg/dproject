@@ -264,6 +264,16 @@ function _dproject_release_configuration_form($source, $packager, $configuration
   return array();
 }
 
+function _dproject_update_project_packager($project_name, $pid) {
+  $p = dproject_get_project_packager($pid);
+  $ptype = dproject_get_packager_types($p->packager);
+  $node = node_load($p->nid);
+  if (isset($ptype['update callback'])) {
+    call_user_func($ptype['update callback'], $p);
+  }
+  drupal_goto('project/' . $node->short_name . '/packagers');
+}
+
 function _dproject_delete_project_packager($form_state, $project_name, $pid) {
   $p = dproject_get_project_packager($pid);
   if ($p) {

@@ -96,7 +96,7 @@ function _dpgit_created($packager, &$status_out=Null) {
   }
 }
 
-function _dpgit_fetch($packager, &$status_out=Null) {
+function _dpgit_fetch($packager, &$status_out=NULL) {
   $wdir = dproject_working_directory_path($packager);
   if (file_exists($wdir)) {
     $out = array();
@@ -116,7 +116,7 @@ function _dpgit_fetch($packager, &$status_out=Null) {
     }
     
     // Return command output if we got a $status_out reference
-    if ($status_out) {
+    if (is_string($status_out)) {
       $status_out = join($out, '<br/>');
     }
     return ($return === 0);
