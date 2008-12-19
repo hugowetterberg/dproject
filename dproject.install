@@ -12,7 +12,7 @@ function dproject_install() {
   // Make sure that we get the correct path for our projects if pathauto
   // is or will be installed.
   variable_set('pathauto_node_dproject_pattern', 'project/[short-name]');
-  
+
   // Install schema
   drupal_install_schema('dproject');
 }
@@ -33,7 +33,7 @@ function dproject_uninstall() {
  **/
 function dproject_schema() {
   $schema = array();
-  
+
   $schema['dproject'] = array(
     'description' => t('Project information'),
     'fields' => array(
@@ -61,7 +61,7 @@ function dproject_schema() {
       'short_name' => array('short_name')
     ),
   );
-  
+
   $schema['dproject_packager'] = array(
     'description' => t('Project packager information'),
     'fields' => array(
@@ -84,6 +84,13 @@ function dproject_schema() {
         'not null' => TRUE,
         'default' => '',
       ),
+      'status' => array(
+        'description' => t('Status code for the packager'),
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 1,
+      ),
       'configuration' => array(
         'description' => t('Packager configuration'),
         'type' => 'text',
@@ -96,7 +103,53 @@ function dproject_schema() {
       'packager' => array('packager'),
     ),
   );
-  
+
+  $schema['dproject_packager_message'] = array(
+    'description' => t('Packager messages'),
+    'fields' => array(
+      'pid' => array(
+        'description' => t('The project packager id.'),
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'module' => array(
+        'description' => t('The module responsible for the message'),
+        'type' => 'varchar',
+        'length' => 64,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'name' => array(
+        'description' => t('The name of the message'),
+        'type' => 'varchar',
+        'length' => 64,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'message' => array(
+        'description' => t('The untranslated message'),
+        'type' => 'text',
+        'size' => 'big',
+      ),
+      'message_arguments' => array(
+        'description' => t('The arguments for the message'),
+        'type' => 'text',
+        'size' => 'big',
+      ),
+      'severity' => array(
+        'description' => t('The severity code.'),
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+    ),
+    'indexes' => array(
+      'severity' => array('severity'),
+    ),
+    'primary key' => array('pid', 'module', 'name'),
+  );
+
   $schema['dproject_release'] = array(
     'description' => t('Project release information'),
     'fields' => array(
@@ -127,10 +180,10 @@ function dproject_schema() {
         'default' => 1,
       ),
       'minor_version' => array(
-        'description' => t('The major release version'),
+        'description' => t('The minor release version'),
         'type' => 'int',
         'unsigned' => TRUE,
-        'not null' => TRUE,
+        'not null' => FALSE,
         'default' => 0,
       ),
       'version_extra' => array(
@@ -139,6 +192,13 @@ function dproject_schema() {
         'length' => 32,
         'not null' => TRUE,
         'default' => '',
+      ),
+      'created' => array(
+        'description' => t('The unix timestamp when the release was created'),
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => FALSE,
+        'default' => 0,
       ),
       'status' => array(
         'description' => t('The status of the release'),
@@ -174,6 +234,6 @@ function dproject_schema() {
     ),
     'primary key' => array('rid'),
   );
-  
+
   return $schema;
 }

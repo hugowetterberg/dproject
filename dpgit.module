@@ -8,30 +8,134 @@ function dpgit_dproject_packager() {
       'type' => 'dcvs',
       'configuration form' => '_dpgit_configure_source',
       'configuration submit' => '_dpgit_configure_source_submit',
-      'update callback' => '_dpgit_pull',
+      'update callback' => '_dpgit_fetch',
       'package callback' => '_dpgit_package',
       'description callback' => '_dpgit_description',
       'packager created' => '_dpgit_created',
       'packager deleted' => '_dpgit_deleted',
       'sources' => array(
         'branches' => array(
-          'title' => t('Branches'),
-          'callback' => '_dpgit_branches',
-          'configuration' => '_dpgit_select_branch_commit',
+          'title' => 'Branches',
+          'options callback' => '_dpgit_branches_options',
+          'submit' => '_dpgit_refs_submit',
         ),
         'tags' => array(
-          'title' => t('Tags'),
-          'callback' => '_dpgit_tags',
+          'title' => 'Tags',
+          'options callback' => '_dpgit_tags_options',
+          'submit' => '_dpgit_refs_submit',
         ),
         'recent_commits' => array(
-          'title' => t('Recent commits'),
-          'callback' => '_dpgit_recent_commits',
-        )
+          'title' => 'Recent commits',
+          'options callback' => '_dpgit_recent_commits',
+          'submit' => '_dpgit_refs_submit',
+        ),
       ),
     ),
   );
 }
 
+/**
+ * Deletes the local git repositiory
+ *
+ * @param stdClass $packager
+ *  The packager object
+ * @return void
+ */
+function _dpgit_deleted($packager) {
+  $wdir = dproject_working_directory_path($packager);
+  if (file_exists(dirname($wdir))) {
+    exec('rm -fr "' . $wdir . '"');
+  }
+}
+
+/**
+ * Creates a local clone of the git repository
+ *
+ * @param stdClass $packager
+ *  The packager object
+ * @return void
+ */
+function _dpgit_created($packager, &$status_out=Null) {
+  $wdir = dproject_working_directory_path($packager);
+  if (file_exists(dirname($wdir)) || mkdir(dirname($wdir), 0777, TRUE)) {
+    // Make sure that the working dir doesn't exist (by killing it if it does)
+    if (file_exists($wdir)) {
+      dproject_delete_directory($wdir);
+    }
+
+    $out = array();
+    $return = 0;
+    $cmd = 'git clone "' . $packager->configuration->url . '" "' . $wdir . '"';
+    exec($cmd, $out, $return);
+
+    if ($return === 0) {
+      drupal_set_message(t('Git: Initialized empty Git repository in !dir', array('!dir' => $wdir)));
+      if ($status_out) {
+        $status_out = join($out, '<br/>');
+      }
+    }
+    else {
+      dproject_set_packager_message($packager, 'dpgit', 'clone', 'Git: Failed to clone !url to !dir:<br/>@out', array(
+        '!url' => $packager->configuration->url,
+        '!dir' => $wdir,
+        '@out' => join($out, '<br/>'),
+      ), WATCHDOG_ERROR);
+    }
+    
+    // Return command output if we got a $status_out reference
+    if ($status_out) {
+      $status_out = join($out, '<br/>');
+    }
+    return ($return === 0);
+  }
+  else {
+    // Let people know if we couldn't prepare a parent directory for the working dir
+    dproject_set_packager_message($packager, 'dpgit', 'clone', 'Git: Failed to create working directory, the parent directory !dir does not exist and could not be created', array(
+      '!dir' => dirname($wdir),
+    ), WATCHDOG_ERROR);
+  }
+}
+
+function _dpgit_fetch($packager, &$status_out=Null) {
+  $wdir = dproject_working_directory_path($packager);
+  if (file_exists($wdir)) {
+    $out = array();
+    $return = 0;
+    $cmd = 'git --git-dir="' . $wdir . '/.git" fetch origin';
+    exec($cmd, $out, $return);
+
+    if ($return === 0) {
+      drupal_set_message(t('Git: Fetched updates from !url', array('!url' => $packager->configuration->url)));
+    }
+    else {
+      dproject_set_packager_message($packager, 'dpgit', 'fetch', 'Git: Failed to fetch updates from !url to !dir:<br/>@out', array(
+        '!url' => $packager->configuration->url,
+        '!dir' => $wdir,
+        '@out' => join($out, '<br/>'),
+      ), WATCHDOG_ERROR);
+    }
+    
+    // Return command output if we got a $status_out reference
+    if ($status_out) {
+      $status_out = join($out, '<br/>');
+    }
+    return ($return === 0);
+  }
+  else {
+    dproject_set_packager_message($packager, 'dpgit', 'fetch', 'Git: The working directort !dir doesn\'t exist', array(
+      '!dir' => $wdir,
+    ), WATCHDOG_ERROR);
+    return FALSE;
+  }
+}
+
+/**
+ * Callback for generating a form fragment for configuring
+ * a new git packager.
+ *
+ * @return array
+ *  A form fragment
+ */
 function _dpgit_configure_source() {
   $form = array();
   $form['git_source'] = array(
@@ -39,51 +143,185 @@ function _dpgit_configure_source() {
     '#required' => TRUE,
     '#title' => t('The url or path to the git repository'),
   );
-  return $form; 
+  return $form;
 }
 
+/**
+ * Callback for turning the submitted values for _dpgit_configure_source
+ * into a configuration array
+ *
+ * @param string $values
+ * @return array
+ *  A configuration array
+ */
 function _dpgit_configure_source_submit($values) {
   return array(
     'url' => $values['git_source'],
   );
 }
 
+/**
+ * Callback for getting a description for a git packager
+ *
+ * @param stdClass $packager
+ *  A packager object
+ * @return string
+ *  A description
+ */
 function _dpgit_description($packager) {
   return $packager->configuration->url;
 }
 
-function _dpgit_select_branch_commit($branch) {
-  
+/**
+ * Callback that creates a temporary directory with the
+ * files to package.
+ *
+ * @param stdClass $packager
+ *  A packager object
+ * @param DProjectRelease $release
+ *  A release object
+ * @return string
+ *  A path to a directory containing the files to package
+ */
+function _dpgit_package($packager, $release) {
+  $repo = dproject_working_directory_path($packager);
+  $target = dproject_working_directory_path($packager, $release);
+
+  if (file_exists(dirname($target)) || mkdir(dirname($target), 0777, TRUE)) {
+    $out = array();
+    $res = _dpgit_checkout($target, $repo . '/.git', $release->metadata->git->sha1, $out);
+    if (!$res) {
+      dproject_set_packager_message($packager->pid, 'git', 'packaging', 'Failed to pack !sha1 into the directory !dir', array(
+        '!sha1' => $release->metadata->git->sha1,
+        '!dir' => $target,
+      ));
+    }
+    else {
+      return $target;
+    }
+  }
 }
 
-function _dpgit_recent_commits() {
-  
+/**
+ * Checks out a specific commit of a git repo into a directory
+ *
+ * @param string $target_dir
+ *  The directory to check out the source into
+ * @param string $git_dir
+ *  The .git directory of the source
+ * @param string $sha1
+ *  The hash of the commit to check out
+ * @param array(string) $out
+ *  An array of lines output by git
+ * @return bool
+ *  Returns TRUE on a successful checkout, FALSE on failure
+ */
+function _dpgit_checkout($target_dir, $git_dir, $sha1, &$out) {
+  // Make sure that the target dir doesn't exist (by killing it if it does)
+  if (file_exists($target_dir)) {
+    dproject_delete_directory($target_dir);
+  }
+
+  $ret = 0;
+  exec('git --work-tree="' . $target_dir . '" --git-dir="' . $git_dir . '" checkout ' . $sha1 . ' -- ./', $out, $ret);
+  return $ret==0;
+}
+
+/**
+ * Callback that is used to get branches for
+ * a packager source list.
+ *
+ * @param stdClass $packager
+ *  A packager object
+ * @return array
+ */
+function _dpgit_branches_options($packager) {
+  $wdir = dproject_working_directory_path($packager);
+  return _dpgit_branches($wdir . '/.git');
+}
+
+/**
+ * Callback that is used to get tags for
+ * a packager source list.
+ *
+ * @param stdClass $packager
+ *  A packager object
+ * @return array
+ */
+function _dpgit_tags_options($packager) {
+  $wdir = dproject_working_directory_path($packager);
+  $options = array();
+  foreach (_dpgit_tags($wdir . '/.git') as $tag) {
+    $options['tags/' . $tag] = $tag;
+  }
+  return $options;
 }
 
 /**
  * Lists the available (remote) branches in a repository
  *
  * @param string $repository
- *  The path to the git repository
+ *  The path to the .git directory
  *
  * @return array(string) An array with the names of the branches
  **/
 function _dpgit_branches($repository) {
   $branches = array();
-  $out = shell_exec('git --git-dir="' . $repository . '/.git" branch -r --no-color');
-  
+  $out = shell_exec('git --git-dir="' . $repository . '" branch -r --no-color');
+
   foreach (split("\n", $out) as $line) {
     if (!empty($line)) {
       $branches[] = trim($line);
     }
   }
-  
+
   return $branches;
 }
 
 /**
+ * Lists the available tags in a repository
+ *
+ * @param string $repository
+ *  The path to the .git directory
+ *
+ * @return array(string) An array with the names of the tags
+ **/
+function _dpgit_tags($repository) {
+  $tags = array();
+  $out = shell_exec('git --git-dir="' . $repository . '" tag -l');
+  foreach (split("\n", $out) as $line) {
+    if (!empty($line)) {
+      $tags[] = trim($line);
+    }
+  }
+
+  return $tags;
+}
+
+/**
+ * Callback that is used to get the recent commits for
+ * a packager source list.
+ *
+ * @param stdClass $packager
+ *  A packager object
+ * @return array
+ */
+function _dpgit_recent_commits($packager) {
+  $wdir = dproject_working_directory_path($packager);
+  $log = _dpgit_log($wdir . '/.git', 20);
+  
+  $recent_commits = array();
+  foreach ($log as $sha1 => $info) {
+    $time = strtotime($info['date']);
+    $recent_commits[$sha1] = format_date($time) . ' - ' . $sha1;
+  }
+  
+  return $recent_commits;
+}
+
+/**
  * Gets the commit log as a associative arrayed keyed to the sha1 of the commit
- * 
+ *
  * Structure:
  * array(
  *  [sha1] => array(
@@ -99,10 +337,12 @@ function _dpgit_branches($repository) {
  * )
  *
  * @param string $repository
- *  The path to the git repository
+ *  The path to the .git directory
  * @param int $commits
  *  The number of log entries to return. Use 0 to get the full log.
  *  Defaults to 10.
+ * @param string $sha1
+ *  Where to start the log from, defaults to HEAD
  * @param string $file
  *  The path to get the log for (relative to the repository root)
  *  Defaults to '.'
@@ -110,28 +350,28 @@ function _dpgit_branches($repository) {
  * @return array
  *  The commit log as a associative arrayed keyed to the sha1 of the commit
  **/
-function _dpgit_log($repository, $commits=10, $file='.') {
+function _dpgit_log($repository, $commits=10, $sha1='HEAD', $file='.') {
   $out = array();
   $retval = 0;
-  
+
   // Create a -<n> flag if we should limit the number of log messages to fetch
   $n_flag = '';
   if ($commits) {
     $n_flag = '-' . $commits;
   }
-  
-  // We can't use exec as it doesn't preserve trailing whitespace and we need 
+
+  // We can't use exec as it doesn't preserve trailing whitespace and we need
   // that to differentiate between empty lines in the commit messages and empty
   // lines separating header, commit message and file listing.
-  $out = shell_exec('git --git-dir="' . $repository . '/.git" log ' . $n_flag . ' --no-color --date=iso --name-status -- .');
+  $out = shell_exec('git --git-dir="' . $repository . '" log ' . $n_flag . ' --no-color --date=iso --name-status ' . $sha1 . ' -- .');
   $out = split("\n", $out);
-  
+
   $log = array();
   $lines = count($out);
   for ($i=0; $i<$lines; $i++) {
-    $sha = substr($out[$i], 7); 
+    $sha = substr($out[$i], 7);
     $info = array();
-    
+
     // Parse the header
     $i++;
     $match = array();
@@ -139,7 +379,7 @@ function _dpgit_log($repository, $commits=10, $file='.') {
       $info[strtolower($match[1])] = $match[2];
       $i++;
     }
-    
+
     // Extract the commit message
     $i++;
     $message = '';
@@ -148,7 +388,7 @@ function _dpgit_log($repository, $commits=10, $file='.') {
       $i++;
     }
     $info['message'] = $message;
-    
+
     // Get info about changes
     $i++;
     $files = array();
@@ -157,30 +397,9 @@ function _dpgit_log($repository, $commits=10, $file='.') {
       $i++;
     }
     $info['files'] = $files;
-    
+
     $log[$sha] = $info;
   }
-  
-  return $log;
-}
 
-/**
- * Lists the available tags in a repository
- *
- * @param string $repository
- *  The path to the git repository
- *
- * @return array(string) An array with the names of the tags
- **/
-function _dpgit_tags($repository) {
-  $tags = array();
-  $out = shell_exec('git --git-dir="' . $repository . '/.git" tag -l');
-  
-  foreach (split("\n", $out) as $line) {
-    if (!empty($line)) {
-      $tags[] = trim($line);
-    }
-  }
-  
-  return $tags;
+  return $log;
 }

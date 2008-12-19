@@ -28,10 +28,18 @@ function dproject_node_info() {
 
 function dproject_menu() {
   $items = array();
-  
+
   $items['dproject/ahah/packager_configuration'] = array(
     'page callback' => '_dproject_ahah_packager_configuration',
     'access arguments' => array('access content'),
+    'type' => MENUITEM_CALLBACK,
+  );
+
+  $items['dproject/ahah/release_source_configuration/%/%'] = array(
+    'page callback' => '_dproject_ahah_release_source_configuration',
+    'page arguments' => array(4),
+    'access callback' => 'node_access',
+    'access arguments' => array('update', 3),
     'type' => MENUITEM_CALLBACK,
   );
 
@@ -43,10 +51,19 @@ function dproject_menu() {
     'type' => MENUITEM_CALLBACK,
   );
 
-  $items['project/%/delete-packager/%'] = array(
+  $items['project/%/packager/%/delete'] = array(
     'title' => t('Delete project packager'),
     'page callback' => 'drupal_get_form',
     'page arguments' => array('_dproject_delete_project_packager', 1, 3),
+    'access callback' => '_dproject_access',
+    'access arguments' => array('update', 1),
+    'type' => MENUITEM_CALLBACK,
+  );
+
+  $items['project/%/packager/%/package'] = array(
+    'title' => t('Package a project release'),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('_dproject_create_project_release', 1, 3),
     'access callback' => '_dproject_access',
     'access arguments' => array('update', 1),
     'type' => MENUITEM_CALLBACK,
@@ -81,15 +98,40 @@ function _dproject_project_packagers($form_state, $short_name) {
     $pp = dproject_get_project_packagers($node->nid);
     $po = '<ul>';
     foreach ($pp as $p) {
-      $po .= '<li><label>' . $p->packager . '</label>' . 
-        l(t('Remove'), 'project/' . $short_name . '/delete-packager/' . $p->pid, array(
+      $po .= '<li><label>' . $p->packager . '</label>';
+      $po .= '<div class="packager-description">';
+      $po .= dproject_packager_description($p);
+      $po .= '</div>';
+
+      $packager_links = array(
+        l(t('Package a release'), 'project/' . $short_name . '/packager/' . $p->pid . '/package', array(
+          'attributes' => array(
+            'class' => 'package',
+          ),
+        )),
+        l(t('Remove'), 'project/' . $short_name . '/packager/' . $p->pid . '/delete', array(
           'attributes' => array(
             'class' => 'delete',
           ),
+        )),
+      );
+
+      // Add a update link if it's supported by the packager type
+      if (isset($packagers[$p->packager]['update callback'])) {
+        $packager_links[] = l(t('Update'), 'project/' . $short_name . '/packager/' . $p->pid . '/update', array(
+          'attributes' => array(
+            'class' => 'update',
+          ),
         ));
-      $po .= '<div class="packager-description">';
-      $po .= dproject_packager_description($p);
-      $po .= '</div></li>';
+      }
+
+      $po .= '<ul class="actions">';
+      foreach ($packager_links as $link) {
+        $po .= '<li>' . $link . '</li>';
+      }
+      $po .= '</ul>';
+
+      $po .= '</li>';
     }
     $po .= '</ul>';
 
@@ -126,21 +168,100 @@ function _dproject_project_packagers($form_state, $short_name) {
 
 function _dproject_project_packagers_submit($form, $form_state) {
   $values = $form_state['values'];
-  $packager = $values['packager'];
+  $packager_type = $values['packager'];
   $packagers = dproject_get_packager_types();
-  if (isset($packagers[$packager]) && isset($packagers[$packager]['configuration submit'])) {
-    $configuration = call_user_func($packagers[$packager]['configuration submit'], $values);
+  if (isset($packagers[$packager_type]) && isset($packagers[$packager_type]['configuration submit'])) {
+    $configuration = call_user_func($packagers[$packager_type]['configuration submit'], $values);
   }
   else {
     $configuration = array();
   }
-  
+
   $values = array(
     'nid' => $values['project'],
-    'packager' => $packager,
+    'packager' => $packager_type,
     'configuration' => json_encode($configuration),
   );
   drupal_write_record('dproject_packager', $values);
+
+  // Call the packager created function for the packager type
+  if (isset($packagers[$packager_type]) && isset($packagers[$packager_type]['packager created'])) {
+    $pid = db_last_insert_id('dproject_packager', 'pid');
+    $packager = dproject_get_project_packager($pid);
+    call_user_func($packagers[$packager_type]['packager created'], $packager);
+  }
+}
+
+function _dproject_create_project_release($form_state, $project_name, $pid) {
+  $packager = dproject_get_project_packager($pid);
+  $packager_type = dproject_get_packager_types($packager->packager);
+  $last_release = dproject_get_latest_release($pid);
+
+  $sources = array(
+    '' => t('--Select a source'),
+  );
+  foreach ($packager_type['sources'] as $name => $def) {
+    $sources[$name] = t($def['title']);
+  }
+
+  $form['source'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Source'),
+    'source_name' => array(
+      '#type' => 'select',
+      '#options' => $sources,
+      '#ahah' => array(
+        'path' => 'dproject/ahah/release_source_configuration/' . $packager->nid . '/' . $pid,
+        'wrapper' => 'source-configuration',
+      ),
+    ),
+    'release_source_configuration' => array(
+      '#type' => 'markup',
+      '#value' => '<div id="source-configuration"></div>',
+    ),
+  );
+
+  $form['api_version'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Api version'),
+    '#default_value' => $last_release ? $last_release->api_version : 6,
+    '#required' => TRUE,
+  );
+
+  $form['major_version'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Major version'),
+    '#default_value' => $last_release ? $last_release->major_version : 1,
+    '#required' => TRUE,
+  );
+
+  $form['minor_version'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Minor version'),
+    '#default_value' => $last_release ? $last_release->minor_version : 0,
+  );
+
+  return $form;
+}
+
+function _dproject_ahah_release_source_configuration($pid) {
+  $source = $_POST['source_name'];
+  $packager = dproject_get_project_packager($pid);
+  _dproject_ahah_helper('release_source_configuration', '_dproject_release_configuration_form', $source, $packager);
+}
+
+function _dproject_release_configuration_form($source, $packager, $configuration=array()) {
+  $ptype = dproject_get_packager_types($packager->packager);
+  $def = $ptype['sources'][$source];
+
+  if (isset($def['options callback'])) {
+    $options = call_user_func($def['options callback'], $packager);
+    return array(
+      '#type' => 'select',
+      '#options' => $options,
+    );
+  }
+  return array();
 }
 
 function _dproject_delete_project_packager($form_state, $project_name, $pid) {
@@ -150,7 +271,7 @@ function _dproject_delete_project_packager($form_state, $project_name, $pid) {
       '!type' => $p->packager,
     )) . '</p>';
     $out .= '<div class="packager-description">' . dproject_packager_description($p) . '</div>';
-    
+
     return array(
       '#submit' => array('_dproject_delete_project_packager_confirmed'),
       'pid' => array(
@@ -181,7 +302,8 @@ function _dproject_delete_project_packager_confirmed($form, $form_state) {
   $p = dproject_get_project_packager($pid);
   if ($p) {
     dproject_delete_project_packager($p);
-    drupal_goto('node/' . $p->nid);
+    $project = node_load($p->nid);
+    drupal_goto('project/' . $project->short_name . '/packagers');
   }
   else {
     drupal_not_found();
@@ -262,9 +384,9 @@ function _dproject_packager_configuration_submit($packager, $configuration=array
 /**
  * Helper function for implementing ahah page callbacks
  *
- * @param string $element 
+ * @param string $element
  *  The name of the form element, can also be a path like "ahah_config/name_field"
- * @param string $form_callback 
+ * @param string $form_callback
  *  The function to call to get the form array
  * @return void
  */
@@ -290,7 +412,7 @@ function _dproject_ahah_helper($element, $form_callback/*, $arg1, $arg2 ...*/) {
   if (is_callable($form_callback)) {
     $set = call_user_func_array($form_callback, $args);
   }
-  
+
   if (empty($set)) {
     $set = array(
       '#value' => '<span></span>',
@@ -305,8 +427,6 @@ function _dproject_ahah_helper($element, $form_callback/*, $arg1, $arg2 ...*/) {
   print drupal_to_js(array('status' => TRUE, 'data' => $output));
   exit;
 }
-
-
 
 /**
  * Implementation of hook_nodeapi
@@ -334,10 +454,27 @@ function dproject_nodeapi($node, $op, $form) {
         if ($eo = db_fetch_object($eres) && $eo->name_exists) {
           form_set_error('short_name', t('The short must be unique'), 'error');
         }
-        
+
         // TODO: Central server check for duplicate names?
       break;
       case 'delete':
+        // Delete all the project packagers
+        $packagers = dproject_get_project_packagers($node->nid);
+        foreach ($packagers as $packager) {
+          dproject_delete_project_packager($packager);
+        }
+
+        // Delete releases
+        db_query('DELETE FROM {dproject_release} WHERE project_nid=%d', array(
+          ':nid' => $node->nid,
+        ));
+
+        // Delete all project files
+        $proj_dir = dproject_project_file_directory($node->nid);
+        if ($proj_dir) {
+          dproject_delete_directory($proj_dir);
+        }
+
         // Clean up project information
         db_query('DELETE FROM {dproject} WHERE nid=%d', array(
           ':nid' => $node->nid,
@@ -351,12 +488,12 @@ function dproject_nodeapi($node, $op, $form) {
           'description' => $node->description,
         );
         drupal_write_record('dproject', $values, $op=='update'?'nid':NULL);
-        if (module_exists('path')) {
+        if (module_exists('path') && !module_exists('pathauto')) {
           path_set_alias('node/' . $node->nid, 'project/' . $node->short_name);
         }
       break;
       case 'prepare':
-        
+
       break;
     }
   }
