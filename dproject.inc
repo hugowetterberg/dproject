@@ -31,7 +31,7 @@ class DProjectRelease {
   public $major_version = 1;
   public $minor_version = 0;
   public $version_extra = '';
-  public $status = DPROJECT_RELEASE_STATUS_UNPUBLISHED,
+  public $status = DPROJECT_RELEASE_STATUS_UNPUBLISHED;
 
   private $tmp_file = FALSE;
   private $file_path = '';
