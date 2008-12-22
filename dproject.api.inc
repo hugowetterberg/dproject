@@ -56,7 +56,6 @@ function dproject_get_packager_types($type_name=NULL) {
  *  A packager object or the id of the packager
  * @return string
  *  A html-fragment describing the packager
- * @author Hugo Wetterberg
  */
 function dproject_packager_description($packager) {
   $pp = dproject_get_packager_types();
