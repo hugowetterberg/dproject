@@ -209,10 +209,10 @@ function dproject_schema() {
       ),
       'status' => array(
         'description' => t('The status of the release'),
-        'type' => 'varchar',
-        'length' => 32,
+        'type' => 'int',
+        'unsigned' => TRUE,
         'not null' => TRUE,
-        'default' => '',
+        'default' => 0,
       ),
       'file_path' => array(
         'description' => t('The path to the release file'),

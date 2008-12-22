@@ -5,12 +5,19 @@
  * @version $Id$
  **/
 
+// Error codes
 define('DPROJECT_TMPDIR_ERROR', 100);
 define('DPROJECT_RELEASE_FILE_READ_ERROR', 101);
 define('DPROJECT_RELEASE_FILE_WRITE_ERROR', 102);
 define('DPROJECT_CHECKSUM_ERROR', 200);
 define('DPROJECT_DB_INTEGRITY_ERROR', 300);
 define('DPROJECT_VALIDATION_ERROR', 400);
+
+// Release status codes
+define('DPROJECT_RELEASE_STATUS_UNPUBLISHED', 0);
+define('DPROJECT_RELEASE_STATUS_UNSUPPORTED', 1);
+define('DPROJECT_RELEASE_STATUS_SUPPORTED', 2);
+define('DPROJECT_RELEASE_STATUS_RECOMMENDED', 3); // Recommended releases are always supprorted
 
 /**
  * A class for release management
@@ -23,7 +30,7 @@ class DProjectRelease {
   public $major_version = 1;
   public $minor_version = 0;
   public $version_extra = '';
-  public $status = 'supported'; // supported, recommended or unsupported
+  public $status = DPROJECT_RELEASE_STATUS_UNPUBLISHED,
 
   private $tmp_file = FALSE;
   private $file_path = '';
@@ -374,6 +381,28 @@ class DProjectRelease {
    */
   public function get_packager() {
     return $this->packager;
+  }
+
+  /**
+   * Sets the status of this release. Use one of
+   * the defined status constants DPROJECT_RELEASE_STATUS_*
+   *
+   * @param int $status
+   *  The status of the release
+   * @return void
+   */
+  public function set_status($status) {
+    $this->status = $status;
+  }
+
+  /**
+   * Gets the status of this release
+   *
+   * @return int
+   *  The status of this release
+   */
+  public function get_status() {
+    return $this->status;
   }
 
   /**
