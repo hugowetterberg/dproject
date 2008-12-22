@@ -200,13 +200,6 @@ function dproject_schema() {
         'not null' => FALSE,
         'default' => 0,
       ),
-      'published' => array(
-        'description' => t('Published'),
-        'type' => 'int',
-        'unsigned' => TRUE,
-        'not null' => FALSE,
-        'default' => 0,
-      ),
       'packager' => array(
         'description' => t('The packager that was used to create the release'),
         'type' => 'int',
