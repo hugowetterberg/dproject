@@ -351,7 +351,7 @@ function _dpgit_branches_options($packager) {
  */
 function _dpgit_ref_sha1($packager, $reference) {
   $wd = dproject_working_directory_path($packager);
-  $info = _dpgit_resolve_reference($wd . '/.git', $values['source_identifier']);
+  $info = _dpgit_resolve_reference($wd . '/.git', $reference);
   return $info ? $info['sha1'] : FALSE;
 }
 
