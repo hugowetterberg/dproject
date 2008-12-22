@@ -227,6 +227,14 @@ function _dpgit_reference_description($packager, $sha1) {
   return theme('git_log', $log);
 }
 
+/**
+ * Theme function for git logs
+ *
+ * @param array $log 
+ *  A log array from _dpgit_log
+ * @return string
+ *  The themed log
+ */
 function _dpgit_theme_log($log) {
   $out = '<ol class="git-log">';
   foreach ($log as $sha1 => $item) {
@@ -237,7 +245,7 @@ function _dpgit_theme_log($log) {
       $out .= '<dt>' . $name . '</dt><dd>' . htmlspecialchars($value) . '</dd>';
     }
     $out .= '</dl>';
-    $out .= '<pre class="message">' . htmlspecialchars($item['message']) . '</pre>';
+    $out .= '<div class="message">' . nl2br(htmlspecialchars($item['message'])) . '</div>';
     $out .= '<ul class="files">';
     foreach ($item['files'] as $file => $status) {
       $out .= '<li class="file file-' . strtolower($status) . '">' . 
