@@ -65,12 +65,37 @@ function dproject_packager_description($packager) {
   }
 
   if (isset($pp[$packager->packager])) {
-    if (isset($pp[$packager->packager]['description callback'])) {
-      return call_user_func($pp[$packager->packager]['description callback'], $packager);
+    if (isset($pp[$packager->packager]['packager description'])) {
+      return call_user_func($pp[$packager->packager]['packager description'], $packager);
     }
   }
   else {
     return '<div class="packager-description packager-description-error">' . t('Error: missing packager type information') . '</div>';
+  }
+}
+
+/**
+ * Gets the description of a source reference
+ *
+ * @param int/stdClass $packager
+ *  A packager object or the id of the packager
+ * @param string $identifier 
+ *  The source identifier to describe
+ * @return string
+ */
+function dproject_source_description($packager, $identifier) {
+  $pp = dproject_get_packager_types();
+  if (is_numeric($packager)) {
+    $packager = dproject_get_project_packager($packager);
+  }
+
+  if (isset($pp[$packager->packager])) {
+    if (isset($pp[$packager->packager]['reference description'])) {
+      return call_user_func($pp[$packager->packager]['reference description'], $packager, $identifier);
+    }
+  }
+  else {
+    return '<div class="source-description source-description-error">' . t('Error: missing source information') . '</div>';
   }
 }
 
@@ -261,7 +286,7 @@ function dproject_set_packager_message($packager_id, $module, $error, $message, 
  *  The path to the packager page
  */
 function dproject_project_packagers_path($project) {
-  if (is_int($project)) {
+  if (is_numeric($project)) {
     $project = node_load($project);
   }
   if (is_object($project)) {

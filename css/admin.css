@@ -1,0 +1,22 @@
+ol.git-log {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+ol.git-log li.commit {
+  margin-left: 0;
+}
+
+ol.git-log .header dt {
+  font-weight: bold;
+  text-transform: capitalize;
+}
+
+ol.git-log ul.files {
+  list-style: none;
+}
+
+ol.git-log ul.files li {
+  background-image: none;
+}

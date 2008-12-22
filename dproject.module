@@ -60,14 +60,38 @@ function dproject_menu() {
     'type' => MENUITEM_CALLBACK,
   );
 
-  $items['project/%/packager/%/package'] = array(
-    'title' => t('Package a project release'),
+  $items['project/%/packager/%/update'] = array(
+    'title' => t('Update'),
+    'page callback' => '_dproject_update_project_packager',
+    'page arguments' => array(1, 3),
+    'access callback' => '_dproject_access',
+    'access arguments' => array('update', 1),
+    'type' => MENUITEM_CALLBACK,
+  );
+
+  $items['project/%/packager/%/release'] = array(
+    'title' => t('Create a project release'),
     'page callback' => 'drupal_get_form',
     'page arguments' => array('_dproject_create_project_release', 1, 3),
     'access callback' => '_dproject_access',
     'access arguments' => array('update', 1),
     'type' => MENUITEM_CALLBACK,
   );
+
+  // We're adding two menuitems to handle the release confirmation page
+  $confirm_release = array(
+    'title' => t('Confirm project release'),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('_dproject_confirm_project_release', 1, 3, 6, 7),
+    'access callback' => '_dproject_access',
+    'access arguments' => array('update', 1),
+    'type' => MENUITEM_CALLBACK,
+  );
+  // ...one menuitem for cases when the release source is identified through reference
+  $items['project/%/packager/%/release/confirm/%/%'] = $confirm_release;
+  // ...and a second menuitem for when the release source is absolutely identified
+  $confirm_release['page arguments'] = array('_dproject_confirm_project_release', 1, 3, 6);
+  $items['project/%/packager/%/release/confirm/%'] = $confirm_release;
 
   return $items;
 }
@@ -83,6 +107,8 @@ function _dproject_access($op, $short_name) {
 function _dproject_project_packagers($form_state, $short_name) {
   $node = dproject_get_project_by_name($short_name);
   if ($node) {
+    drupal_set_breadcrumb(array(l(t('Home'), '<front>'), l($node->title, 'node/' . $node->nid)));
+
     drupal_set_title(t('Packagers for !name', array(
       '!name' => $node->title,
     )));
@@ -104,7 +130,7 @@ function _dproject_project_packagers($form_state, $short_name) {
       $po .= '</div>';
 
       $packager_links = array(
-        l(t('Package a release'), 'project/' . $short_name . '/packager/' . $p->pid . '/package', array(
+        l(t('Create a release'), 'project/' . $short_name . '/packager/' . $p->pid . '/release', array(
           'attributes' => array(
             'class' => 'package',
           ),
@@ -117,7 +143,7 @@ function _dproject_project_packagers($form_state, $short_name) {
       );
 
       // Add a update link if it's supported by the packager type
-      if (isset($packagers[$p->packager]['update callback'])) {
+      if (isset($packagers[$p->packager]['update'])) {
         $packager_links[] = l(t('Update'), 'project/' . $short_name . '/packager/' . $p->pid . '/update', array(
           'attributes' => array(
             'class' => 'update',
@@ -194,8 +220,23 @@ function _dproject_project_packagers_submit($form, $form_state) {
 
 function _dproject_create_project_release($form_state, $project_name, $pid) {
   $packager = dproject_get_project_packager($pid);
+  $project = node_load($packager->nid);
   $packager_type = dproject_get_packager_types($packager->packager);
   $last_release = dproject_get_latest_release($pid);
+
+  drupal_set_title(t('Create a release of !name', array('!name' => $project->title)));
+  drupal_set_breadcrumb(array(
+    l(t('Home'), '<front>'),
+    l($project->title, 'node/' . $node->nid),
+    l('Packagers', dproject_project_packagers_path($project)),
+  ));
+
+  $form = array();
+
+  $form['pid'] = array(
+    '#type' => 'value',
+    '#value' => $pid,
+  );
 
   $sources = array(
     '' => t('--Select a source'),
@@ -239,26 +280,216 @@ function _dproject_create_project_release($form_state, $project_name, $pid) {
     '#type' => 'textfield',
     '#title' => t('Minor version'),
     '#default_value' => $last_release ? $last_release->minor_version : 0,
+    '#required' => TRUE,
+  );
+
+  $form['version_extra'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Version extra'),
+    '#default_value' => $last_release ? $last_release->version_extra : '',
+  );
+
+  $form['#validate'] = array('_dproject_create_project_release_validate');
+  $form['#submit'] = array('_dproject_create_project_release_submit');
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Create'),
   );
 
   return $form;
 }
 
+function _dproject_is_int($v) {
+  if (is_numeric($v) && intval($v)==$v) {
+    return TRUE;
+  }
+}
+
+function _dproject_create_project_release_validate($form, $form_state) {
+  $values = $form_state['values'];
+  $packager = dproject_get_project_packager($values['pid']);
+  $packager_type = dproject_get_packager_types($packager->packager);
+
+  // Validate the versions that always have to be integers
+  $nv = array(
+    'api_version' => t('Api version'),
+    'major_version' => t('Major version'),
+  );
+  foreach ($nv as $field => $title) {
+    if (!is_numeric($values[$field])) {
+      form_set_error($field, t('The !title must be a number', array(
+        '!title' => $title,
+      )));
+    }
+  }
+
+  // Validate the minor version number
+  if (!_dproject_is_int($values['minor_version']) || $values['minor_version']<0) {
+    if ($values['version_extra'] != 'dev') {
+      form_set_error('version_extra', 'You must create a "dev" release if you don\'t provide a numeric minor version number equal to or greater than zero');
+    }
+    else if ($values['minor_version']!='x') {
+      drupal_set_message('Warning! The non-numeric or negative minor version number for this dev-release is interpreted as unspecified and will be replaced by an x', 'warning');
+    }
+  }
+
+  // Warn when creating a dev release with a specified minor version
+  if ($values['version_extra'] == 'dev' && _dproject_is_int($values['minor_version'])) {
+    drupal_set_message('Warning! You are creating a dev release so the minor version number for this release will be set as unspecified and replaced by an x', 'warning');
+  }
+
+  // Validate the version extra format
+  if (!empty($values['version_extra']) && !preg_match('/^[_a-z0-9]+$/', $values['version_extra'])) {
+    form_set_error('version_extra', t('The version extra field can only contain lower-case letters, numbers and underscores'));
+  }
+
+  if (empty($values['source_identifier'])) {
+    form_set_error('source_name', t('You have to select a valid source for the release'));
+  }
+  else {
+    $source = $packager_type['sources'][$values['source_name']];
+    if (isset($source['resolve'])) {
+      $res = call_user_func_array($source['resolve'], array($packager, $values['source_identifier']));
+      if ($res === FALSE) {
+        form_set_error('source_identifier', t('The selected source is not valid'));
+      }
+    }
+  }
+}
+
+function _dproject_create_project_release_submit($form, $form_state) {
+  $values = $form_state['values'];
+  $packager = dproject_get_project_packager($values['pid']);
+  $packager_type = dproject_get_packager_types($packager->packager);
+  $project = node_load($packager->nid);
+
+  $rel = new DProjectRelease($project);
+
+  // Set version so that we can get the version string
+  $rel->set_version($values['api_version'], $values['major_version'], $values['minor_version'], $values['version_extra']);
+  $version = $rel->version_string();
+
+  // Create source path
+  $source = $packager_type['sources'][$values['source_name']];
+  /* TODO:
+   *  We're taking out an insurance against Drupal not making a difference
+   *  between escaped and unescaped forward-slashes when getting arguments
+   *  from path. Confirm that this is a known problem, should I use another
+   *  method than urlencode to escape slashes, or double-encode?
+   *
+   * TODO:
+   *  When fixed, make sure that we scrap the ' ' => '/' conversion at the
+   *  recieving end.
+   */
+  $source_path = urlencode(str_replace('/', ' ', $values['source_identifier']));
+  if (isset($source['resolve'])) {
+    $res = call_user_func_array($source['resolve'], array($packager, $values['source_identifier']));
+    if ($res != $values['source_identifier']) {
+      $source_path .= '/' . urlencode($res);
+    }
+  }
+
+  // Send the user to the confirmation page
+  drupal_goto("project/{$project->short_name}/packager/{$packager->pid}/release/confirm/{$version}/{$source_path}");
+}
+
+function _dproject_confirm_project_release($form_state, $project_name, $pid, $version_string, $source_reference, $source_identifier=NULL) {
+  drupal_add_css(drupal_get_path('module','dproject') . '/css/admin.css');
+  
+  $source_reference = str_replace(' ', '/', $source_reference);
+  if ($source_identifier == NULL) {
+    $source_identifier = $source_reference;
+  }
+
+  $packager = dproject_get_project_packager($pid);
+  $project = node_load($packager->nid);
+  $packager_type = dproject_get_packager_types($packager->packager);
+  $source = $packager_type['sources'][$values['source_name']];
+
+  drupal_set_title(t('Confirm release settings for !name', array('!name' => $project->title)));
+
+  $rel = new DProjectRelease($project);
+  $rel->version_from_string($version_string);
+
+  // Set the packager for the release and store its configuration
+  $rel->set_packager($pid);
+  if (isset($packager_type['configure release'])) {
+    call_user_func_array($packager_type['configure release'], array(
+      &$rel, $packager, $source_reference, $source_identifier,
+    ));
+  }
+
+  $reference = '<div class="reference">' . $source_reference . '</div>';
+  if ($source_reference != $source_identifier) {
+    $reference .= '<div class="identifier">' . $source_identifier . '</div>';
+  }
+
+  return array(
+    '#id' => 'dproject-confirm-release-configuration-form',
+    'release' => array(
+      '#type' => 'value',
+      '#value' => $rel,
+    ),
+    'intro_text' => array(
+      '#value' => '<p>' . t('Please confirm that the release version is correct and that the source is properly configured before creating the release') . '</p>',
+    ),
+    'version' => array(
+      '#type' => 'item',
+      '#title' => t('Version'),
+      '#value' => $version_string,
+    ),
+    'packager_description' => array(
+      '#type' => 'item',
+      '#title' => t('Packager'),
+      '#value' => $packager->packager . ':<br/>' . dproject_packager_description($packager),
+    ),
+    'reference' => array(
+      '#type' => 'item',
+      '#title' => t('Source reference'),
+      '#value' => $reference,
+    ),
+    'source_description' => array(
+      '#type' => 'item',
+      '#title' => t('Source description'),
+      '#value' => dproject_source_description($packager, $source_identifier),
+    ),
+    'cancel_link' => array(
+      '#type' => 'markup',
+      '#value' => l(t('Cancel'), dproject_project_packagers_path($project)),
+    ),
+    '#submit' => array('_dproject_project_release_create'),
+    'submit' => array(
+      '#type' => 'submit',
+      '#value' => t('Create release'),
+    ),
+  );
+}
+
+function _dproject_project_release_create($form, $form_state) {
+  $release = $form_state['values']['release'];
+  $packager = dproject_get_project_packager($release->get_packager());
+  $project = node_load($packager->nid);
+  $packager_type = dproject_get_packager_types($packager->packager);
+  //TODO: Finish the release creation process
+}
+
 function _dproject_ahah_release_source_configuration($pid) {
   $source = $_POST['source_name'];
   $packager = dproject_get_project_packager($pid);
-  _dproject_ahah_helper('release_source_configuration', '_dproject_release_configuration_form', $source, $packager);
+  _dproject_ahah_helper('source/release_source_configuration', '_dproject_release_configuration_form', $source, $packager);
 }
 
 function _dproject_release_configuration_form($source, $packager, $configuration=array()) {
   $ptype = dproject_get_packager_types($packager->packager);
   $def = $ptype['sources'][$source];
 
-  if (isset($def['options callback'])) {
-    $options = call_user_func($def['options callback'], $packager);
+  if (isset($def['options'])) {
+    $options = call_user_func($def['options'], $packager);
     return array(
-      '#type' => 'select',
-      '#options' => $options,
+      'source_identifier' => array(
+        '#type' => 'select',
+        '#options' => $options,
+      ),
     );
   }
   return array();
@@ -268,8 +499,8 @@ function _dproject_update_project_packager($project_name, $pid) {
   $p = dproject_get_project_packager($pid);
   $ptype = dproject_get_packager_types($p->packager);
   $node = node_load($p->nid);
-  if (isset($ptype['update callback'])) {
-    call_user_func($ptype['update callback'], $p);
+  if (isset($ptype['update'])) {
+    call_user_func($ptype['update'], $p);
   }
   drupal_goto('project/' . $node->short_name . '/packagers');
 }

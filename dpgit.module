@@ -1,37 +1,76 @@
 <?php
 // $Id$
 
+define('DPGIT_DPROJECT_NAMESPACE', 'http://goodold.se/project/dproject/dpgit');
+
 function dpgit_dproject_packager() {
   return array(
     'git' => array(
       'title' => t('Git'),
-      'type' => 'dcvs',
-      'configuration form' => '_dpgit_configure_source',
+      'namespace' => DPGIT_DPROJECT_NAMESPACE,
+      'configuration form' => '_dpgit_configure_source', 
       'configuration submit' => '_dpgit_configure_source_submit',
-      'update callback' => '_dpgit_fetch',
-      'package callback' => '_dpgit_package',
-      'description callback' => '_dpgit_description',
+      'update' => '_dpgit_fetch',
+      'package' => '_dpgit_package',
+      'configure release' => '_dpgit_configure_release',
+      'packager description' => '_dpgit_description',
+      'reference description' => '_dpgit_reference_description',
       'packager created' => '_dpgit_created',
       'packager deleted' => '_dpgit_deleted',
       'sources' => array(
         'branches' => array(
           'title' => 'Branches',
-          'options callback' => '_dpgit_branches_options',
-          'submit' => '_dpgit_refs_submit',
+          'options' => '_dpgit_branches_options',
+          'resolve' => '_dpgit_ref_sha1',
         ),
         'tags' => array(
           'title' => 'Tags',
-          'options callback' => '_dpgit_tags_options',
-          'submit' => '_dpgit_refs_submit',
+          'options' => '_dpgit_tags_options',
+          'resolve' => '_dpgit_ref_sha1',
         ),
         'recent_commits' => array(
           'title' => 'Recent commits',
-          'options callback' => '_dpgit_recent_commits',
-          'submit' => '_dpgit_refs_submit',
+          'options' => '_dpgit_recent_commits',
+          'resolve' => '_dpgit_ref_sha1',
         ),
       ),
     ),
   );
+}
+
+function dpgit_theme() {
+  return array(
+    'git_log' => array(
+      'function' => '_dpgit_theme_log',
+      'arguments' => array('log' => array()),
+    ),
+  );
+}
+
+/**
+ * Configures a release object using the supplied information
+ *
+ * @param DProjectRelease $release 
+ *  The release object to configure
+ * @param stdClass $packager 
+ *  The packager object
+ * @param string $reference 
+ *  The reference that was used (tag, branch, sha1 and so on)
+ * @param string $sha1 
+ *  The sha1 that the reference has been resolved to
+ * @return void
+ */
+function _dpgit_configure_release(&$release, $packager, $reference, $sha1) {
+  $config = array(
+    'sha1' => $sha1,
+    'origin' => $packager->configuration->url,
+  );
+  
+  if ($reference != $sha1) {
+    $config['reference'] = $reference;
+  }
+  
+  $release->set_metadata('git', DPGIT_DPROJECT_NAMESPACE, (object)$config);
 }
 
 /**
@@ -81,7 +120,7 @@ function _dpgit_created($packager, &$status_out=Null) {
         '@out' => join($out, '<br/>'),
       ), WATCHDOG_ERROR);
     }
-    
+
     // Return command output if we got a $status_out reference
     if ($status_out) {
       $status_out = join($out, '<br/>');
@@ -114,7 +153,7 @@ function _dpgit_fetch($packager, &$status_out=NULL) {
         '@out' => join($out, '<br/>'),
       ), WATCHDOG_ERROR);
     }
-    
+
     // Return command output if we got a $status_out reference
     if (is_string($status_out)) {
       $status_out = join($out, '<br/>');
@@ -169,7 +208,46 @@ function _dpgit_configure_source_submit($values) {
  *  A description
  */
 function _dpgit_description($packager) {
-  return $packager->configuration->url;
+  return '<strong>' . t('Origin') . ':</strong> ' . $packager->configuration->url;
+}
+
+/**
+ * Gets the description of a commit reference
+ *
+ * @param stdClass $packager
+ *  A packager object
+ * @param string $sha1
+ *  The hash of the commit to check out
+ * @return string
+ *  The description of the reference
+ */
+function _dpgit_reference_description($packager, $sha1) {
+  $wd = dproject_working_directory_path($packager);
+  $log = _dpgit_log($wd . '/.git', 1, $sha1, '.');
+  return theme('git_log', $log);
+}
+
+function _dpgit_theme_log($log) {
+  $out = '<ol class="git-log">';
+  foreach ($log as $sha1 => $item) {
+    $out .= '<li class="commit">';
+    $out .= '<dl class="header">';
+    $out .=   '<dt>sha1</dt><dd class="sha1">' . $sha1 . '</dd>';
+    foreach ($item['header'] as $name => $value) {
+      $out .= '<dt>' . $name . '</dt><dd>' . htmlspecialchars($value) . '</dd>';
+    }
+    $out .= '</dl>';
+    $out .= '<pre class="message">' . htmlspecialchars($item['message']) . '</pre>';
+    $out .= '<ul class="files">';
+    foreach ($item['files'] as $file => $status) {
+      $out .= '<li class="file file-' . strtolower($status) . '">' . 
+        '<span class="file-status">' . $status . '</span> ' . 
+        '<span class="file-name">' . htmlspecialchars($file) . '</span></li>';
+    }
+    $out .= '</ul>';
+    $out .= '</li>';
+  }
+  return $out . '</ol>';
 }
 
 /**
@@ -228,19 +306,6 @@ function _dpgit_checkout($target_dir, $git_dir, $sha1, &$out) {
 }
 
 /**
- * Callback that is used to get branches for
- * a packager source list.
- *
- * @param stdClass $packager
- *  A packager object
- * @return array
- */
-function _dpgit_branches_options($packager) {
-  $wdir = dproject_working_directory_path($packager);
-  return _dpgit_branches($wdir . '/.git');
-}
-
-/**
  * Callback that is used to get tags for
  * a packager source list.
  *
@@ -255,6 +320,61 @@ function _dpgit_tags_options($packager) {
     $options['tags/' . $tag] = $tag;
   }
   return $options;
+}
+
+/**
+ * Callback that is used to get branches for
+ * a packager source list.
+ *
+ * @param stdClass $packager
+ *  A packager object
+ * @return array
+ */
+function _dpgit_branches_options($packager) {
+  $wdir = dproject_working_directory_path($packager);
+  $options = array();
+  foreach (_dpgit_branches($wdir . '/.git') as $branch) {
+    $options['refs/remotes/' . $branch] = $branch;
+  }
+  return $options;
+}
+
+/**
+ * Gets the sha1 hash for a reference
+ *
+ * @param stdClass $packager
+ *  A packager object
+ * @param string $reference
+ *  The reference (sha1, tag or branch)
+ * @return bool
+ *  Returns the sha1 hash if the reference was resolved, otherwise FALSE is returned
+ */
+function _dpgit_ref_sha1($packager, $reference) {
+  $wd = dproject_working_directory_path($packager);
+  $info = _dpgit_resolve_reference($wd . '/.git', $values['source_identifier']);
+  return $info ? $info['sha1'] : FALSE;
+}
+
+/**
+ * Returns information about a reference
+ *
+ * @param string $repository
+ *  The path to the .git directory
+ * @param string $reference
+ *  The reference (sha1, tag or branch)
+ * @return array
+ *  Log entry for the reference
+ */
+function _dpgit_resolve_reference($repository, $reference) {
+  $l = _dpgit_log($repository, 1, $reference);
+  foreach ($l as $sha1 => $info) {
+    if (!empty($sha1)) {
+      $info['sha1'] = $sha1;
+      return $info;
+    }
+    break;
+  }
+  return FALSE;
 }
 
 /**
@@ -309,13 +429,13 @@ function _dpgit_tags($repository) {
 function _dpgit_recent_commits($packager) {
   $wdir = dproject_working_directory_path($packager);
   $log = _dpgit_log($wdir . '/.git', 20);
-  
+
   $recent_commits = array();
   foreach ($log as $sha1 => $info) {
-    $time = strtotime($info['date']);
+    $time = strtotime($info['header']['date']);
     $recent_commits[$sha1] = format_date($time) . ' - ' . $sha1;
   }
-  
+
   return $recent_commits;
 }
 
@@ -325,11 +445,13 @@ function _dpgit_recent_commits($packager) {
  * Structure:
  * array(
  *  [sha1] => array(
- *    'author'  => [name <email>],
- *    'date'    => [iso date-time],
+ *    'header' => array(
+ *      'author'  => [name <email>],
+ *      'date'    => [iso date-time],
+ *    ),
  *    'message' => [commit message],
- *    'files'   => array(
- *      [file] => [status],
+ *    'files' => array(
+ *      [file]  => [status],
  *      ...
  *    )
  *  ),
@@ -346,11 +468,14 @@ function _dpgit_recent_commits($packager) {
  * @param string $file
  *  The path to get the log for (relative to the repository root)
  *  Defaults to '.'
+ * @param bool $raw
+ *  Set to TRUE to skip parsing and return the raw log
  *
  * @return array
- *  The commit log as a associative arrayed keyed to the sha1 of the commit
+ *  The commit log as a associative arrayed keyed to the sha1 of the commit.
+ *  Or the lines in the log in a array if $raw is set to TRUE.
  **/
-function _dpgit_log($repository, $commits=10, $sha1='HEAD', $file='.') {
+function _dpgit_log($repository, $commits=10, $sha1='HEAD', $file='.', $raw=FALSE) {
   $out = array();
   $retval = 0;
 
@@ -364,19 +489,33 @@ function _dpgit_log($repository, $commits=10, $sha1='HEAD', $file='.') {
   // that to differentiate between empty lines in the commit messages and empty
   // lines separating header, commit message and file listing.
   $out = shell_exec('git --git-dir="' . $repository . '" log ' . $n_flag . ' --no-color --date=iso --name-status ' . $sha1 . ' -- .');
+
   $out = split("\n", $out);
+
+  // Return the raw output if requested
+  if ($raw) {
+    return $out;
+  }
 
   $log = array();
   $lines = count($out);
   for ($i=0; $i<$lines; $i++) {
-    $sha = substr($out[$i], 7);
+    $match = array();
+    if (preg_match('/commit ([0-9a-f]+)/', $out[$i], $match)) {
+      $sha = $match[1];
+    }
+    else { // Skip forward if we don't get a sha
+      continue;
+    }
+
     $info = array();
 
     // Parse the header
     $i++;
     $match = array();
+    $info['header'] = array();
     while(!empty($out[$i]) && preg_match('/^([^:]+):\s*(.+)$/', $out[$i], $match)) {
-      $info[strtolower($match[1])] = $match[2];
+      $info['header'][strtolower($match[1])] = $match[2];
       $i++;
     }
 

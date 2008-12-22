@@ -28,6 +28,7 @@ class DProjectRelease {
   private $tmp_file = FALSE;
   private $file_path = '';
   private $md5 = '';
+  private $packager = 0;
   private $metadata;
 
   /**
@@ -267,16 +268,151 @@ class DProjectRelease {
    */
   public function version_from_string($version) {
     $matches = array();
-    if (preg_match('/(\d+)\.x-(\d+)\.(\d+)(-([^\s]+))?/', $version, $matches)) {
+    if (preg_match('/^(\d+)\.x-(\d+)\.(x|[\d]+)-?([_a-z0-9]+)?$/', $version, $matches)) {
       $this->api_version = $matches[1];
       $this->major_version = $matches[2];
       $this->minor_version = $matches[3];
       if (!empty($matches[5])) {
         $this->version_extra = $matches[5];
       }
+      else {
+        $this->version_extra = NULL;
+      }
       return TRUE;
     }
     return FALSE;
+  }
+
+  /**
+   * Sets all version information for the release
+   *
+   * @param int $api
+   *  The drupal api version
+   * @param int $major
+   *  The major version of the release
+   * @param int $minor
+   *  The minor version of the release
+   * @param string $extra
+   *  The extra version information (dev, beta, and so on)
+   * @return void
+   */
+  public function set_version($api, $major, $minor, $extra=NULL) {
+    $this->api_version = $api;
+    $this->major_version = $major;
+    $this->minor_version = $minor;
+    $this->version_extra = $extra;
+  }
+
+  /**
+   * Sets the information needed for the
+   * packager to create a release
+   *
+   * @param stdClass $packager
+   *  The packager object
+   * @param array $configuration
+   *  The packager configuration data
+   */
+  public function set_packager_info($packager, $configuration) {
+    $this->packager = $packager->pid;
+    $this->metadata->packager = $configuration;
+  }
+
+  /**
+   * Private helper function to get the name to use
+   * for the namespace uri.
+   *
+   * @param string $uri
+   *  The namespace uri
+   * @param string $name
+   *  Optional. Set this if you want a name that you can use to
+   *  create a new metadata entry, omit if you only want to get
+   *  the name of a existing metadata namespace.
+   * @return string
+   *  The name that is or should be used
+   */
+  private function metadata_namespace_name($uri, $name=FALSE) {
+    $existing = get_object_vars($this->metadata);
+
+    // Get the name from existing entry if the
+    // uri already has metadata set
+    foreach ($existing as $a_name => $obj) {
+      if ($obj->namespace == $uri) {
+        return $a_name;
+      }
+    }
+
+    if ($name!==FALSE) {
+      $candidate = $name;
+      $i = 0;
+
+      while (isset($existing[$candidate]) && $existing[$candidate]->namespace!=$uri) {
+        $i++;
+        $candidate = $name . '-' . $i;
+      }
+      return $candidate;
+    }
+
+    return FALSE;
+  }
+
+  /**
+   * Sets the packager for this release
+   *
+   * @param int $pid
+   *  The packager used for this release
+   * @return void
+   */
+  public function set_packager($pid) {
+    $this->packager = $pid;
+  }
+
+  /**
+   * Gets the packager for this release
+   *
+   * @return int
+   *  The packager used for this release
+   */
+  public function get_packager() {
+    return $this->packager;
+  }
+
+  /**
+   * Gets the metadata for a namespace
+   *
+   * @param string $namespace
+   *  The namespace to get the data for
+   * @return stdClass|bool metadata
+   *  A reference to the stored metadata or FALSE if no metadata was stored
+   *  for the namespace.
+   */
+  public function get_metadata($namespace) {
+    $name = metadata_namespace_name($namespace);
+    if ($name!==FALSE) {
+      $obj = $this->metadata->$name;
+      return $obj->data;
+    }
+    return FALSE;
+  }
+
+  /**
+   * Sets the metadata for a namespace
+   *
+   * @param string $name
+   *  The name that the caller would like as a alias for
+   *  the namespace. Will be altered if needed to ensure
+   *  the uniqueness of namespace aliases.
+   * @param string $namespace
+   *  The namespace for the metadata
+   * @param stdClass $data
+   *  The data to store
+   * @return void
+   */
+  public function set_metadata($name, $namespace, $data) {
+    $name = $this->metadata_namespace_name($namespace, $name);
+    $this->metadata->$name = (object)array(
+      'namespace' => $namespace,
+      'data' => $data,
+    );
   }
 }
 
