@@ -14,10 +14,11 @@ define('DPROJECT_DB_INTEGRITY_ERROR', 300);
 define('DPROJECT_VALIDATION_ERROR', 400);
 
 // Release status codes
-define('DPROJECT_RELEASE_STATUS_UNPUBLISHED', 0);
-define('DPROJECT_RELEASE_STATUS_UNSUPPORTED', 1);
-define('DPROJECT_RELEASE_STATUS_SUPPORTED', 2);
-define('DPROJECT_RELEASE_STATUS_RECOMMENDED', 3); // Recommended releases are always supprorted
+define('DPROJECT_RELEASE_STATUS_TEMPORARY', 0); // Temporary releases will be deleted within one hour of creation
+define('DPROJECT_RELEASE_STATUS_UNPUBLISHED', 1);
+define('DPROJECT_RELEASE_STATUS_UNSUPPORTED', 2);
+define('DPROJECT_RELEASE_STATUS_SUPPORTED', 3);
+define('DPROJECT_RELEASE_STATUS_RECOMMENDED', 4); // Recommended releases are always supported
 
 /**
  * A class for release management
@@ -47,6 +48,25 @@ class DProjectRelease {
   public function DProjectRelease($project_node) {
     $this->metadata = new stdClass();
     $this->project_node = $project_node;
+  }
+  
+  /**
+   * Replaces the node object with the nid so that
+   * we don't serialize the whole node object
+   *
+   * @return void
+   */
+  public function __sleep() {
+    $this->project_node = $this->project_node->nid;
+  }
+  
+  /**
+   * Restore the node object from the serialized nid
+   *
+   * @return void
+   */
+  public function __wakeup() {
+    $this->project_node = node_load($this->project_node);
   }
 
   /**
