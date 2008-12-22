@@ -13,10 +13,41 @@ ol.git-log .header dt {
   text-transform: capitalize;
 }
 
+ol.git-log .message, ol.git-log .header, ol.git-log .files{
+  margin: 10px;
+  padding: 10px;
+  background: #F0FFF0;
+  border: 1px solid #999999;
+}
+
+ol.git-log .header {
+  background: #F0FFFF;
+}
+
+ol.git-log .files {
+  background: #FFFFF0;
+}
+
 ol.git-log ul.files {
   list-style: none;
 }
 
 ol.git-log ul.files li {
   background-image: none;
+}
+
+ol.git-log ul.files span.file-status {
+  padding: 2px;
+}
+
+ol.git-log ul.files li.file-m span.file-status {
+  background-color: #FFFFAA;
+}
+
+ol.git-log ul.files li.file-a span.file-status {
+  background-color: #AAFFAA;
+}
+
+ol.git-log ul.files li.file-d span.file-status {
+  background-color: #FFAAAA;
 }
