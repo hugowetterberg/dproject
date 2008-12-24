@@ -8,14 +8,17 @@ function dpgit_requirements($phase) {
   if ($phase=='runtime') {
     $out = array();
     $return = 0;
-    exec('git --version', $out, $return);
+    $git_path = variable_get('git_path', 'git');
+    exec($git_path . ' --version', $out, $return);
     
     $requirements['git'] = array(
       'title' => $t('Git version'),
     );
       
     if (empty($out) || $return) {
-      $requirements['git']['description'] = $t('Git is not installed on your system or it\'s not on your path');
+      $requirements['git']['description'] = $t('Git is not installed on your system or it\'s not on your path. !link', array(
+        '!link' => l($t('Click here to configure git'),'admin/settings/git'),
+      ));
       $requirements['git']['severity'] = REQUIREMENT_ERROR;
     }
     else {

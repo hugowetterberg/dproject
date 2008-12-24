@@ -26,12 +26,13 @@ define('DPROJECT_RELEASE_STATUS_RECOMMENDED', 4); // Recommended releases are al
 class DProjectRelease {
   private $project_node;
 
-  public $rid = 0;
-  public $api_version = 6;
-  public $major_version = 1;
-  public $minor_version = 0;
-  public $version_extra = '';
-  public $status = DPROJECT_RELEASE_STATUS_UNPUBLISHED;
+  private $rid = 0;
+  private $api_version = 6;
+  private $major_version = 1;
+  private $minor_version = 0;
+  private $version_extra = '';
+  private $status = DPROJECT_RELEASE_STATUS_UNPUBLISHED;
+  private $created = 0;
 
   private $tmp_file = FALSE;
   private $file_path = '';
@@ -49,7 +50,7 @@ class DProjectRelease {
     $this->metadata = new stdClass();
     $this->project_node = $project_node;
   }
-  
+
   /**
    * Replaces the node object with the nid so that
    * we don't serialize the whole node object
@@ -59,7 +60,7 @@ class DProjectRelease {
   public function __sleep() {
     $this->project_node = $this->project_node->nid;
   }
-  
+
   /**
    * Restore the node object from the serialized nid
    *
@@ -86,7 +87,7 @@ class DProjectRelease {
    **/
   public static function load($rid, $project_node=NULL) {
     $res = db_query("SELECT rid, project_nid, api_version, major_version, minor_version,
-        version_extra, status, file_path, md5, release_metadata
+        version_extra, status, packager, created, file_path, md5, release_metadata
       FROM {dproject_release}
       WHERE rid = %d", $rid);
     // Get the state as an array so that we can use DProjectRelease::__set_state to create the release object
@@ -245,8 +246,31 @@ class DProjectRelease {
     }
   }
 
-  private function save() {
+  public function save() {
+    $values = array(
+      'project_nid' => $this->project_node->nid,
+      'api_version' => $this->api_version,
+      'major_version' => $this->major_version,
+      'minor_version' => $this->minor_version,
+      'version_extra' => $this->version_extra,
+      'created' => $this->created,
+      'packager' => $this->packager,
+      'status' => $this->status,
+      'file_path' => $this->file_path,
+      'md5' => $this->md5,
+      'release_metadata' => json_encode($this->metadata),
+    );
 
+    // Update if we got a release id
+    if ($this->rid) {
+      $values['rid'] = $this->rid;
+      drupal_write_record('dproject_release', $values, array('rid'));
+    }
+    else { // ...insert if we don't
+      $values['created'] = time();
+      drupal_write_record('dproject_release', $values);
+      $this->rid = db_last_insert_id('dproject_release', 'rid');
+    }
   }
 
   /**
@@ -277,7 +301,7 @@ class DProjectRelease {
    */
   public function version_string() {
     $vs = $this->api_version . '.x';
-    $vs .= '-' . $this->major_version . '.' . (is_int($this->minor_version)?$this->minor_version:'x');
+    $vs .= '-' . $this->major_version . '.' . ($this->minor_version!=NULL?$this->minor_version:'x');
     if (!empty($this->version_extra)) {
       $vs .= '-' . $this->version_extra;
     }
@@ -296,15 +320,14 @@ class DProjectRelease {
   public function version_from_string($version) {
     $matches = array();
     if (preg_match('/^(\d+)\.x-(\d+)\.(x|[\d]+)-?([_a-z0-9]+)?$/', $version, $matches)) {
-      $this->api_version = $matches[1];
-      $this->major_version = $matches[2];
-      $this->minor_version = $matches[3];
-      if (!empty($matches[5])) {
-        $this->version_extra = $matches[5];
+      if (!empty($matches[4])) {
+        $extra = $matches[4];
       }
       else {
-        $this->version_extra = NULL;
+        $extra = NULL;
       }
+      
+      $this->set_version($matches[1], $matches[2], $matches[3], $extra);
       return TRUE;
     }
     return FALSE;
@@ -326,7 +349,7 @@ class DProjectRelease {
   public function set_version($api, $major, $minor, $extra=NULL) {
     $this->api_version = $api;
     $this->major_version = $major;
-    $this->minor_version = $minor;
+    $this->minor_version = $extra!='dev' ? $minor : NULL;
     $this->version_extra = $extra;
   }
 
@@ -380,6 +403,26 @@ class DProjectRelease {
     }
 
     return FALSE;
+  }
+
+  /**
+   * Gets the id of this release
+   *
+   * @return int
+   *  The id of this release
+   */
+  public function get_id() {
+    return $this->rid;
+  }
+
+  /**
+   * Gets the project node for this release
+   *
+   * @return stdClass
+   *  The project node for this release
+   */
+  public function get_project_node() {
+    return $this->project_node;
   }
 
   /**

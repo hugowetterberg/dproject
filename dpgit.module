@@ -38,6 +38,9 @@ function dpgit_dproject_packager() {
   );
 }
 
+/**
+ * Implementation of hook_theme
+ */
 function dpgit_theme() {
   return array(
     'git_log' => array(
@@ -45,6 +48,35 @@ function dpgit_theme() {
       'arguments' => array('log' => array()),
     ),
   );
+}
+
+/**
+ * Implementation of hook_menu
+ */
+function dpgit_menu() {
+  $items = array();
+  
+  $items['admin/settings/git'] = array(
+    'title' => 'Git settings',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('_dpgit_settings'),
+    'type' => MENU_NORMAL_ITEM,
+    'access arguments' => array('administer site configuration'),
+  );
+  
+  return $items;
+}
+
+function _dpgit_settings($form_state) {
+  $form = array();
+  $git_path = variable_get('git_path', 'git');
+  $form['git_path'] = array(
+    '#title' => t('Git path'),
+    '#type' => 'textfield',
+    '#default_value' => $git_path,
+  );
+  
+  return system_settings_form($form);
 }
 
 /**
@@ -56,19 +88,18 @@ function dpgit_theme() {
  *  The packager object
  * @param string $reference 
  *  The reference that was used (tag, branch, sha1 and so on)
- * @param string $sha1 
- *  The sha1 that the reference has been resolved to
  * @return void
  */
-function _dpgit_configure_release(&$release, $packager, $reference, $sha1) {
+function _dpgit_configure_release(&$release, $packager, $reference) {
   $config = array(
-    'sha1' => $sha1,
     'origin' => $packager->configuration->url,
   );
   
+  $sha1 = _dpgit_ref_sha1($packager, $reference);
   if ($reference != $sha1) {
     $config['reference'] = $reference;
   }
+  $config['sha1'] = $sha1;
   
   $release->set_metadata('git', DPGIT_DPROJECT_NAMESPACE, (object)$config);
 }
@@ -83,7 +114,7 @@ function _dpgit_configure_release(&$release, $packager, $reference, $sha1) {
 function _dpgit_deleted($packager) {
   $wdir = dproject_working_directory_path($packager);
   if (file_exists(dirname($wdir))) {
-    exec('rm -fr "' . $wdir . '"');
+    dproject_delete_directory($wdir);
   }
 }
 
@@ -104,7 +135,7 @@ function _dpgit_created($packager, &$status_out=Null) {
 
     $out = array();
     $return = 0;
-    $cmd = 'git clone "' . $packager->configuration->url . '" "' . $wdir . '"';
+    $cmd = _dpgit_shell_command('clone "' . $packager->configuration->url . '" "' . $wdir . '"');
     exec($cmd, $out, $return);
 
     if ($return === 0) {
@@ -140,7 +171,7 @@ function _dpgit_fetch($packager, &$status_out=NULL) {
   if (file_exists($wdir)) {
     $out = array();
     $return = 0;
-    $cmd = 'git --git-dir="' . $wdir . '/.git" fetch origin';
+    $cmd = _dpgit_shell_command('fetch origin', $wdir . '/.git');
     exec($cmd, $out, $return);
 
     if ($return === 0) {
@@ -309,7 +340,7 @@ function _dpgit_checkout($target_dir, $git_dir, $sha1, &$out) {
   }
 
   $ret = 0;
-  exec('git --work-tree="' . $target_dir . '" --git-dir="' . $git_dir . '" checkout ' . $sha1 . ' -- ./', $out, $ret);
+  exec(_dpgit_shell_command('checkout ' . $sha1 . ' -- ./', $git_dir, $target_dir), $out, $ret);
   return $ret==0;
 }
 
@@ -386,6 +417,31 @@ function _dpgit_resolve_reference($repository, $reference) {
 }
 
 /**
+ * Helper function that creates shell commands for working with git
+ *
+ * @param string $command 
+ *  The command that should be sent to git
+ * @param string $git_dir 
+ *  Optional. The path to the .git directory that should be used
+ * @param string $work_dir 
+ *  Optional. The path to the working directory that should be used
+ * @return string
+ *  The full command, including the path to the git binary, and options
+ *  for git and working directory 
+ */
+function _dpgit_shell_command($command, $git_dir=NULL, $work_dir=NULL) {
+  if ($git_dir) {
+    $command = '--git-dir="' . $git_dir . '" ' . $command;
+  }
+  if ($working_dir) {
+    $command = '--work-tree="' . $work_dir . '" ' . $command;
+  }
+  
+  $git_path = variable_get('git_path', 'git');
+  return $git_path . ' ' . $command;
+}
+
+/**
  * Lists the available (remote) branches in a repository
  *
  * @param string $repository
@@ -395,7 +451,7 @@ function _dpgit_resolve_reference($repository, $reference) {
  **/
 function _dpgit_branches($repository) {
   $branches = array();
-  $out = shell_exec('git --git-dir="' . $repository . '" branch -r --no-color');
+  $out = shell_exec(_dpgit_shell_command('branch -r --no-color', $repository));
 
   foreach (split("\n", $out) as $line) {
     if (!empty($line)) {
@@ -416,7 +472,7 @@ function _dpgit_branches($repository) {
  **/
 function _dpgit_tags($repository) {
   $tags = array();
-  $out = shell_exec('git --git-dir="' . $repository . '" tag -l');
+  $out = shell_exec(_dpgit_shell_command('tag -l', $repository));
   foreach (split("\n", $out) as $line) {
     if (!empty($line)) {
       $tags[] = trim($line);
@@ -496,7 +552,7 @@ function _dpgit_log($repository, $commits=10, $sha1='HEAD', $file='.', $raw=FALS
   // We can't use exec as it doesn't preserve trailing whitespace and we need
   // that to differentiate between empty lines in the commit messages and empty
   // lines separating header, commit message and file listing.
-  $out = shell_exec('git --git-dir="' . $repository . '" log ' . $n_flag . ' --no-color --date=iso --name-status ' . $sha1 . ' -- .');
+  $out = shell_exec(_dpgit_shell_command('log ' . $n_flag . ' --no-color --date=iso --name-status ' . $sha1 . ' -- .', $repository));
 
   $out = split("\n", $out);
 
