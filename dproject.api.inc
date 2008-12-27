@@ -156,7 +156,7 @@ function dproject_project_file_directory($project) {
 function dproject_working_directory_path($packager, $release=NULL) {
   if ($release) {
     // Temporary working directories are stored in the temporary directory
-    return file_directory_temp() . '/dproject/' . $release->rid;
+    return file_directory_temp() . '/dproject/' . $release->get_id();
   }
   else {
     // Permanent working directories are stored in the project file directory
