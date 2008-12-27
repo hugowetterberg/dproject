@@ -1,13 +1,12 @@
 <?php
 /**
- * dproject module.
+ * The main file for the dproject module
  *
  * @version $Id$
  **/
 
 define('DPROJECT_NAMESPACE', 'http://goodold.se/project/dproject');
 
-require_once('dproject.inc');
 require_once('dproject.api.inc');
 require_once('dproject.token.inc');
 
@@ -288,11 +287,7 @@ function _dproject_create_project_release($form_state, $project_name, $pid) {
   $form['release_type'] = array(
     '#type' => 'checkboxes',
     '#title' => t('Release type'),
-    '#options' => array(
-      'bug_fixes' => t('Bug fixes'),
-      'features' => t('New features'),
-      'security' => t('Security update'),
-    ),
+    '#options' => dproject_release_types(TRUE),
     '#required' => TRUE,
   );
 
@@ -447,16 +442,23 @@ function _dproject_confirm_project_release($form_state, $project_name, $pid, $ri
 
   drupal_set_title(t('Confirm release settings for !name', array('!name' => $project->title)));
 
-  $reference = '<div class="reference">' . $source_reference . '</div>';
-  if ($source_reference != $source_identifier) {
-    $reference .= '<div class="identifier">' . $source_identifier . '</div>';
+  $metadata = $rel->get_metadata(DPROJECT_NAMESPACE);
+  
+  // Fill an array with the human readable names
+  // of the selected release types
+  $rt = array();
+  $release_types = dproject_release_types(TRUE);
+  foreach ($metadata->terms as $term) {
+    if (isset($release_types[$term])) {
+      $rt[] = $release_types[$term];
+    }
   }
 
   return array(
     '#id' => 'dproject-confirm-release-configuration-form',
     'release' => array(
       '#type' => 'value',
-      '#value' => $rel,
+      '#value' => $rel->get_id(),
     ),
     'intro_text' => array(
       '#value' => '<p>' . t('Please confirm that the release version is correct and that the source is properly configured before creating the release') . '</p>',
@@ -466,22 +468,24 @@ function _dproject_confirm_project_release($form_state, $project_name, $pid, $ri
       '#title' => t('Version'),
       '#value' => $rel->version_string(),
     ),
+    'release_type' => array(
+      '#type' => 'item',
+      '#title' => t('Release type'),
+      '#value' => join($rt, '<br/>'),
+    ),
     'packager_description' => array(
       '#type' => 'item',
-      '#title' => t('Packager'),
-      '#value' => $packager->packager . ':<br/>' . dproject_packager_description($packager),
-    ),
-    'reference' => array(
-      '#type' => 'item',
-      '#title' => t('Source reference'),
-      '#value' => $reference,
+      '#title' => t('Packager (@name)', array('@name' => $packager->packager)),
+      '#value' => dproject_packager_description($packager),
     ),
     'source_description' => array(
       '#type' => 'item',
       '#title' => t('Source description'),
-      '#value' => dproject_source_description($packager, $source_identifier),
+      '#value' => dproject_release_source_description($rel),
     ),
-    'cancel_link' => array(
+    // TODO: The cancel link should be rewired to a middle step that deletes the 
+    // temporary release entry, minimizing the cleanup work that cron has to do.
+    'cancel_link' => array( 
       '#type' => 'markup',
       '#value' => l(t('Cancel'), dproject_project_packagers_path($project)),
     ),
@@ -494,11 +498,12 @@ function _dproject_confirm_project_release($form_state, $project_name, $pid, $ri
 }
 
 function _dproject_project_release_create($form, $form_state) {
-  $release = $form_state['values']['release'];
+  $rel = DProjectRelease::load($form_state['values']['release']);
+  $project = $packager->get_project_node();
   $packager = dproject_get_project_packager($release->get_packager());
-  $project = node_load($packager->nid);
   $packager_type = dproject_get_packager_types($packager->packager);
-  //TODO: Finish the release creation process
+  
+  
 }
 
 function _dproject_ahah_release_source_configuration($pid) {

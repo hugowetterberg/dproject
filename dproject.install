@@ -1,6 +1,6 @@
 <?php
 /**
- * Contains implementation install, uninstall and schema hooks for dproject.
+ * Contains implementation of install, uninstall and schema hooks for dproject.
  *
  * @version $Id$
  **/

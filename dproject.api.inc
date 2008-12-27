@@ -1,5 +1,12 @@
 <?php
-// $Id$
+/**
+ * Functions that can be used by other modules to interact with the dproject module
+ *
+ * @version $Id$
+ **/
+
+// Include the class definitions for dproject
+require_once('dproject.inc');
 
 /**
  * Gets a project node by the short name
@@ -74,28 +81,28 @@ function dproject_packager_description($packager) {
 }
 
 /**
- * Gets the description of a source reference
+ * Gets the description of a release's source
  *
- * @param int/stdClass $packager
- *  A packager object or the id of the packager
- * @param string $identifier 
- *  The source identifier to describe
+ * @param DProjectRelease $release
+ *  The the release object
  * @return string
  */
-function dproject_source_description($packager, $identifier) {
+function dproject_release_source_description($release) {
   $pp = dproject_get_packager_types();
-  if (is_numeric($packager)) {
-    $packager = dproject_get_project_packager($packager);
-  }
+  $packager = dproject_get_project_packager($release->get_packager());
 
+  $description = '';
   if (isset($pp[$packager->packager])) {
-    if (isset($pp[$packager->packager]['reference description'])) {
-      return call_user_func($pp[$packager->packager]['reference description'], $packager, $identifier);
+    if (isset($pp[$packager->packager]['release source description'])) {
+      $description = call_user_func($pp[$packager->packager]['release source description'], $release);
     }
   }
-  else {
+
+  if (empty($description)){
     return '<div class="source-description source-description-error">' . t('Error: missing source information') . '</div>';
   }
+
+  return $description;
 }
 
 /**
@@ -349,5 +356,36 @@ function dproject_delete_directory($dir) {
     // We really want to delete whatever is on this path
     // kill it even if it's a file
     unlink($dir);
+  }
+}
+
+/**
+ * Returns the release types as a associative array with
+ * the machine-readable name as key and the human readable
+ * name as value
+ *
+ * @param bool $localize
+ *  Set to true if you want the human-readable name to
+ *  be localized. As the old project module uses a human-
+ *  readable value for release type terms this defaults
+ *  to FALSE.
+ *
+ * @return array
+ */
+function dproject_release_types($localize=FALSE) {
+  if ($localize) {
+    return array(
+      'bug_fixes' => t('Bug fixes'),
+      'features' => t('New features'),
+      'security' => t('Security update'),
+    );
+  }
+  else
+  {
+    return array(
+      'bug_fixes' => 'Bug fixes',
+      'features' => 'New features',
+      'security' => 'Security update',
+    );
   }
 }

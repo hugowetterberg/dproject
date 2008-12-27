@@ -478,7 +478,7 @@ class DProjectRelease {
    *  for the namespace.
    */
   public function get_metadata($namespace) {
-    $name = metadata_namespace_name($namespace);
+    $name = $this->metadata_namespace_name($namespace);
     if ($name!==FALSE) {
       $obj = $this->metadata->$name;
       return $obj->data;

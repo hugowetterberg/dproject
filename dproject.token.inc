@@ -1,5 +1,10 @@
 <?php
-// $Id$
+/**
+ * Implementation of token hooks to provide token values for
+ * dproject nodes
+ *
+ * @version $Id$
+ **/
 
 /**
  * Implementation of hook_token_values().

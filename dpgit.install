@@ -1,5 +1,9 @@
 <?php
-// $Id$
+/**
+ * File for install, uninstall and requirement-checking hooks for dpgit
+ *
+ * @version $Id$
+ **/
 
 function dpgit_requirements($phase) {
   $requirements = array();
