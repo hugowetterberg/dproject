@@ -447,7 +447,7 @@ function _dpgit_shell_command($command, $git_dir=NULL, $work_dir=NULL) {
   if ($git_dir) {
     $command = '--git-dir="' . $git_dir . '" ' . $command;
   }
-  if ($working_dir) {
+  if ($work_dir) {
     $command = '--work-tree="' . $work_dir . '" ' . $command;
   }
 
