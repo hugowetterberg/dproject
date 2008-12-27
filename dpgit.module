@@ -1,5 +1,9 @@
 <?php
-// $Id$
+/**
+ * This module provides integration with the git versioning system
+ *
+ * @version $Id$
+ **/
 
 define('DPGIT_DPROJECT_NAMESPACE', 'http://goodold.se/project/dproject/dpgit');
 
@@ -8,13 +12,13 @@ function dpgit_dproject_packager() {
     'git' => array(
       'title' => t('Git'),
       'namespace' => DPGIT_DPROJECT_NAMESPACE,
-      'configuration form' => '_dpgit_configure_source', 
+      'configuration form' => '_dpgit_configure_source',
       'configuration submit' => '_dpgit_configure_source_submit',
       'update' => '_dpgit_fetch',
       'package' => '_dpgit_package',
       'configure release' => '_dpgit_configure_release',
       'packager description' => '_dpgit_description',
-      'reference description' => '_dpgit_reference_description',
+      'release source description' => '_dpgit_release_source_description',
       'packager created' => '_dpgit_created',
       'packager deleted' => '_dpgit_deleted',
       'sources' => array(
@@ -55,7 +59,7 @@ function dpgit_theme() {
  */
 function dpgit_menu() {
   $items = array();
-  
+
   $items['admin/settings/git'] = array(
     'title' => 'Git settings',
     'page callback' => 'drupal_get_form',
@@ -63,7 +67,7 @@ function dpgit_menu() {
     'type' => MENU_NORMAL_ITEM,
     'access arguments' => array('administer site configuration'),
   );
-  
+
   return $items;
 }
 
@@ -75,18 +79,18 @@ function _dpgit_settings($form_state) {
     '#type' => 'textfield',
     '#default_value' => $git_path,
   );
-  
+
   return system_settings_form($form);
 }
 
 /**
  * Configures a release object using the supplied information
  *
- * @param DProjectRelease $release 
+ * @param DProjectRelease $release
  *  The release object to configure
- * @param stdClass $packager 
+ * @param stdClass $packager
  *  The packager object
- * @param string $reference 
+ * @param string $reference
  *  The reference that was used (tag, branch, sha1 and so on)
  * @return void
  */
@@ -94,13 +98,13 @@ function _dpgit_configure_release(&$release, $packager, $reference) {
   $config = array(
     'origin' => $packager->configuration->url,
   );
-  
+
   $sha1 = _dpgit_ref_sha1($packager, $reference);
   if ($reference != $sha1) {
     $config['reference'] = $reference;
   }
   $config['sha1'] = $sha1;
-  
+
   $release->set_metadata('git', DPGIT_DPROJECT_NAMESPACE, (object)$config);
 }
 
@@ -243,25 +247,35 @@ function _dpgit_description($packager) {
 }
 
 /**
- * Gets the description of a commit reference
+ * Gets the description of a release's source
  *
- * @param stdClass $packager
- *  A packager object
- * @param string $sha1
- *  The hash of the commit to check out
+ * @param DProjectRelease $release
+ *  The the release object
  * @return string
- *  The description of the reference
+ *  The description of the source
  */
-function _dpgit_reference_description($packager, $sha1) {
-  $wd = dproject_working_directory_path($packager);
-  $log = _dpgit_log($wd . '/.git', 1, $sha1, '.');
-  return theme('git_log', $log);
+function _dpgit_release_source_description($release) {
+  $packager = dproject_get_project_packager($release->get_packager());
+  $git_info = $release->get_metadata(DPGIT_DPROJECT_NAMESPACE);
+
+  if ($git_info) {
+    $wd = dproject_working_directory_path($packager);
+    $log = _dpgit_log($wd . '/.git', 1, $git_info->sha1, '.');
+
+    $reference = $git_info->sha1;
+    if (isset($git_info->reference)) {
+      $reference = $git_info->reference;
+    }
+    $out = '<h2 class="source-reference">' . $reference . '</h2>';
+    $out .= theme('git_log', $log);
+    return $out;
+  }
 }
 
 /**
  * Theme function for git logs
  *
- * @param array $log 
+ * @param array $log
  *  A log array from _dpgit_log
  * @return string
  *  The themed log
@@ -279,8 +293,8 @@ function _dpgit_theme_log($log) {
     $out .= '<div class="message">' . nl2br(htmlspecialchars($item['message'])) . '</div>';
     $out .= '<ul class="files">';
     foreach ($item['files'] as $file => $status) {
-      $out .= '<li class="file file-' . strtolower($status) . '">' . 
-        '<span class="file-status">' . $status . '</span> ' . 
+      $out .= '<li class="file file-' . strtolower($status) . '">' .
+        '<span class="file-status">' . $status . '</span> ' .
         '<span class="file-name">' . htmlspecialchars($file) . '</span></li>';
     }
     $out .= '</ul>';
@@ -419,15 +433,15 @@ function _dpgit_resolve_reference($repository, $reference) {
 /**
  * Helper function that creates shell commands for working with git
  *
- * @param string $command 
+ * @param string $command
  *  The command that should be sent to git
- * @param string $git_dir 
+ * @param string $git_dir
  *  Optional. The path to the .git directory that should be used
- * @param string $work_dir 
+ * @param string $work_dir
  *  Optional. The path to the working directory that should be used
  * @return string
  *  The full command, including the path to the git binary, and options
- *  for git and working directory 
+ *  for git and working directory
  */
 function _dpgit_shell_command($command, $git_dir=NULL, $work_dir=NULL) {
   if ($git_dir) {
@@ -436,7 +450,7 @@ function _dpgit_shell_command($command, $git_dir=NULL, $work_dir=NULL) {
   if ($working_dir) {
     $command = '--work-tree="' . $work_dir . '" ' . $command;
   }
-  
+
   $git_path = variable_get('git_path', 'git');
   return $git_path . ' ' . $command;
 }
