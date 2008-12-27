@@ -430,6 +430,19 @@ function _dproject_create_project_release_submit($form, $form_state) {
   drupal_goto("project/{$project->short_name}/packager/{$packager->pid}/release/confirm/{$rid}");
 }
 
+/**
+ * Displays a release confirmation page
+ *
+ * @param array $form 
+ *  The form array
+ * @param array $form_state
+ *  The form state
+ * @param string $pid 
+ *  The id of the used packager
+ * @param string $rid 
+ *  The if of the release
+ * @return void
+ */
 function _dproject_confirm_project_release($form_state, $project_name, $pid, $rid) {
   drupal_add_css(drupal_get_path('module','dproject') . '/css/admin.css');
 
