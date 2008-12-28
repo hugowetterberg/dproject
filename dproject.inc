@@ -5,6 +5,8 @@
  * @version $Id$
  **/
 
+define('DPROJECT_NAMESPACE', 'http://goodold.se/project/dproject');
+
 // Error codes
 define('DPROJECT_TMPDIR_ERROR', 100);
 define('DPROJECT_RELEASE_FILE_READ_ERROR', 101);
@@ -34,11 +36,14 @@ class DProjectRelease {
   private $status = DPROJECT_RELEASE_STATUS_UNPUBLISHED;
   private $created = 0;
 
+  private $file_changed = FALSE;
   private $tmp_file = FALSE;
   private $file_path = '';
   private $md5 = '';
   private $packager = 0;
   private $metadata;
+
+  private $file_alters = array();
 
   /**
    * Project release constructor
@@ -165,7 +170,8 @@ class DProjectRelease {
         array('!file' => $file, '!md5' => $md5), DPROJECT_CHECKSUM_ERROR, TRUE);
     }
 
-    $this->tmp_file = $tmp_file && is_writable($file_path);
+    $this->file_changed = TRUE;
+    $this->tmp_file = $tmp_file;
     $this->file_path = $file_path;
     $this->md5 = $file_md5;
   }
@@ -212,6 +218,7 @@ class DProjectRelease {
               array('!file' => $file, '!md5' => $md5), DPROJECT_CHECKSUM_ERROR);
           }
 
+          $this->file_changed = TRUE;
           $this->tmp_file = TRUE;
           $this->file_path = $file_path;
           $this->md5 = $file_md5;
@@ -246,7 +253,43 @@ class DProjectRelease {
     }
   }
 
+  /**
+   * Persist file that has been set through fileSet or fileLoad
+   *
+   * @return void
+   */
+  private function persist_file() {
+    if ($this->file_changed) {
+      $pi = pathinfo($this->file_path);
+
+      // Create the path for the release file and delete it if it exists
+      $release_path = dproject_project_file_directory($this->project_node) .
+        '/releases/' . $pi['basename'];
+      if (!file_exists(dirname($release_path))) {
+        mkdir(dirname($release_path), 0777, TRUE);
+      }
+      else if (file_exists($release_path)) {
+        unlink($release_path);
+      }
+
+      // Move or copy the file to it's destination
+      if ($this->tmp_file) {
+        rename($this->file_path, $release_path);
+      }
+      else {
+        copy($this->file_path, $release_path);
+      }
+
+      // Set all file related values
+      $this->tmp_file = FALSE;
+      $this->file_changed = FALSE;
+      $this->file_path = $release_path;
+    }
+  }
+
   public function save() {
+    $this->persist_file();
+
     $values = array(
       'project_nid' => $this->project_node->nid,
       'api_version' => $this->api_version,
@@ -326,7 +369,7 @@ class DProjectRelease {
       else {
         $extra = NULL;
       }
-      
+
       $this->set_version($matches[1], $matches[2], $matches[3], $extra);
       return TRUE;
     }
@@ -365,44 +408,6 @@ class DProjectRelease {
   public function set_packager_info($packager, $configuration) {
     $this->packager = $packager->pid;
     $this->metadata->packager = $configuration;
-  }
-
-  /**
-   * Private helper function to get the name to use
-   * for the namespace uri.
-   *
-   * @param string $uri
-   *  The namespace uri
-   * @param string $name
-   *  Optional. Set this if you want a name that you can use to
-   *  create a new metadata entry, omit if you only want to get
-   *  the name of a existing metadata namespace.
-   * @return string
-   *  The name that is or should be used
-   */
-  private function metadata_namespace_name($uri, $name=FALSE) {
-    $existing = get_object_vars($this->metadata);
-
-    // Get the name from existing entry if the
-    // uri already has metadata set
-    foreach ($existing as $a_name => $obj) {
-      if ($obj->namespace == $uri) {
-        return $a_name;
-      }
-    }
-
-    if ($name!==FALSE) {
-      $candidate = $name;
-      $i = 0;
-
-      while (isset($existing[$candidate]) && $existing[$candidate]->namespace!=$uri) {
-        $i++;
-        $candidate = $name . '-' . $i;
-      }
-      return $candidate;
-    }
-
-    return FALSE;
   }
 
   /**
@@ -469,17 +474,65 @@ class DProjectRelease {
   }
 
   /**
-   * Gets the metadata for a namespace
+   * Private helper function to get the name to use
+   * for the namespace uri.
    *
+   * @param string $uri
+   *  The namespace uri
+   * @param string $name
+   *  Optional. Set this if you want a name that you can use to
+   *  create a new metadata entry, omit if you only want to get
+   *  the name of a existing metadata namespace.
+   * @return string
+   *  The name that is or should be used
+   */
+  private function metadata_namespace_name($uri, $name=FALSE) {
+    $existing = get_object_vars($this->metadata);
+
+    // Get the name from existing entry if the
+    // uri already has metadata set
+    foreach ($existing as $a_name => $obj) {
+      if ($obj->namespace == $uri) {
+        return $a_name;
+      }
+    }
+
+    if ($name!==FALSE) {
+      $candidate = $name;
+      $i = 0;
+
+      while (isset($existing[$candidate]) && $existing[$candidate]->namespace!=$uri) {
+        $i++;
+        $candidate = $name . '-' . $i;
+      }
+      return $candidate;
+    }
+
+    return FALSE;
+  }
+
+  /**
+   * Gets the metadata object for a namespace
+   *
+   * @param string $name
+   *  The name that the caller would like as a alias for
+   *  the namespace. Will be altered if needed to ensure
+   *  the uniqueness of namespace aliases.
    * @param string $namespace
    *  The namespace to get the data for
    * @return stdClass|bool metadata
    *  A reference to the stored metadata or FALSE if no metadata was stored
    *  for the namespace.
    */
-  public function get_metadata($namespace) {
-    $name = $this->metadata_namespace_name($namespace);
+  public function get_metadata_object($name = 'dproject', $namespace = DPROJECT_NAMESPACE) {
+    $name = $this->metadata_namespace_name($namespace, $name);
     if ($name!==FALSE) {
+      if (!isset($this->metadata->$name)) {
+        $this->metadata->$name = (object)array(
+          'data' => new stdClass(),
+          'namespace' => $namespace,
+        );
+      }
       $obj = $this->metadata->$name;
       return $obj->data;
     }
@@ -487,24 +540,42 @@ class DProjectRelease {
   }
 
   /**
-   * Sets the metadata for a namespace
+   * Used to add file alters
    *
-   * @param string $name
-   *  The name that the caller would like as a alias for
-   *  the namespace. Will be altered if needed to ensure
-   *  the uniqueness of namespace aliases.
-   * @param string $namespace
-   *  The namespace for the metadata
-   * @param stdClass $data
-   *  The data to store
-   * @return void
+   * @param string $callback
+   *
+   * @return array
+   *  Returns the registered file alters
    */
-  public function set_metadata($name, $namespace, $data) {
-    $name = $this->metadata_namespace_name($namespace, $name);
-    $this->metadata->$name = (object)array(
-      'namespace' => $namespace,
-      'data' => $data,
-    );
+  public function add_file_alter($callback=NULL) {
+    $metadata = $this->get_metadata_object();
+    if (!isset($metadata->file_alters)) {
+      $metadata->file_alters = array();
+    }
+    $metadata->file_alters[] = $callback;
+    return $metadata->file_alters;
+  }
+
+  /**
+   * Alters the file before adding it to a release archive
+   *
+   * @param string $file
+   *  The path of the file
+   * @return string
+   *  The final contents of the file
+   */
+  public function file_alter($file) {
+    $pi = pathinfo($file);
+    $content = file_get_contents($file);
+    $metadata = $this->get_metadata_object();
+
+    if (!empty($metadata->file_alters)) {
+      foreach ($metadata->file_alters as $callback) {
+        call_user_func_array($callback, array(&$this, $pi, &$content));
+      }
+    }
+
+    return $content;
   }
 }
 

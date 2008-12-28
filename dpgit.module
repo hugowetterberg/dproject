@@ -51,6 +51,10 @@ function dpgit_theme() {
       'function' => '_dpgit_theme_log',
       'arguments' => array('log' => array()),
     ),
+    'git_log_item' => array(
+      'function' => '_dpgit_theme_log_item',
+      'arguments' => array('sha1'=>'', 'item' => array()),
+    ),
   );
 }
 
@@ -95,17 +99,56 @@ function _dpgit_settings($form_state) {
  * @return void
  */
 function _dpgit_configure_release(&$release, $packager, $reference) {
-  $config = array(
-    'origin' => $packager->configuration->url,
-  );
+  $metadata = $release->get_metadata_object('git', DPGIT_DPROJECT_NAMESPACE);
+  $metadata->origin = $packager->configuration->url;
 
-  $sha1 = _dpgit_ref_sha1($packager, $reference);
-  if ($reference != $sha1) {
-    $config['reference'] = $reference;
+  $wd = dproject_working_directory_path($packager);
+  $info = _dpgit_resolve_reference($wd . '/.git', $reference);
+  $release->add_file_alter('_dgit_expand_keywords');
+
+  if ($info) {
+    $sha1 = $info['sha1'];
+    $metadata->sha1 = $sha1;
+    if ($reference != $sha1) {
+      $metadata->reference = $reference;
+    }
+    $metadata->info = $info;
   }
-  $config['sha1'] = $sha1;
+}
 
-  $release->set_metadata('git', DPGIT_DPROJECT_NAMESPACE, (object)$config);
+/**
+ * Expands the $Id$ keywords in a file
+ *
+ * @param DProjectRelease $release
+ *  The release that this file is part of
+ * @param array $path_info
+ *  Path information for the file
+ * @param string $content
+ *  The contents of the file
+ * @return void
+ */
+function _dpgit_expand_keywords(&$release, $path_info, &$content) {
+  // The supported file extensions
+  $ext = array(
+    'module' => '<?php // %s ?>',
+    'install' => '<?php // %s ?>',
+    'info' => "; %s\n",
+    'php' => '<?php // %s ?>',
+    'inc' => '<?php // %s ?>',
+    'js' => "// %s\n",
+    'css' => "/* %s */\n",
+  );
+  if (isset($ext[$path_info['extension']])) {
+    $metadata = $release->get_metadata_object('git', DPGIT_DPROJECT_NAMESPACE);
+    $id_kw = '$Id: ' . $path_info['basename'] . ', sha1: ' . $metadata->sha1 . ' ' .
+      $metadata->info->header->date . ' ' . $metadata->info->header->author . ' Exp $';
+    $count = 0;
+    $content = preg_replace('/\$Id\$/', $id_kw, $content, -1, $count);
+    if (!$count) {
+      $comment_style = $ext[$path_info['extension']];
+      $content = sprintf($comment_style, $id_kw) . $content;
+    }
+  }
 }
 
 /**
@@ -256,7 +299,7 @@ function _dpgit_description($packager) {
  */
 function _dpgit_release_source_description($release) {
   $packager = dproject_get_project_packager($release->get_packager());
-  $git_info = $release->get_metadata(DPGIT_DPROJECT_NAMESPACE);
+  $git_info = $release->get_metadata_object('git', DPGIT_DPROJECT_NAMESPACE);
 
   if ($git_info) {
     $wd = dproject_working_directory_path($packager);
@@ -284,23 +327,28 @@ function _dpgit_theme_log($log) {
   $out = '<ol class="git-log">';
   foreach ($log as $sha1 => $item) {
     $out .= '<li class="commit">';
-    $out .= '<dl class="header">';
-    $out .=   '<dt>sha1</dt><dd class="sha1">' . $sha1 . '</dd>';
-    foreach ($item['header'] as $name => $value) {
-      $out .= '<dt>' . $name . '</dt><dd>' . htmlspecialchars($value) . '</dd>';
-    }
-    $out .= '</dl>';
-    $out .= '<div class="message">' . nl2br(htmlspecialchars($item['message'])) . '</div>';
-    $out .= '<ul class="files">';
-    foreach ($item['files'] as $file => $status) {
-      $out .= '<li class="file file-' . strtolower($status) . '">' .
-        '<span class="file-status">' . $status . '</span> ' .
-        '<span class="file-name">' . htmlspecialchars($file) . '</span></li>';
-    }
-    $out .= '</ul>';
+    $out .= theme('git_log_item', $sha1, $item);
     $out .= '</li>';
   }
   return $out . '</ol>';
+}
+
+function _dpgit_theme_log_item($sha1, $item) {
+  $out .= '<dl class="header">';
+  $out .=   '<dt>sha1</dt><dd class="sha1">' . $sha1 . '</dd>';
+  foreach ($item['header'] as $name => $value) {
+    $out .= '<dt>' . $name . '</dt><dd>' . htmlspecialchars($value) . '</dd>';
+  }
+  $out .= '</dl>';
+  $out .= '<div class="message">' . nl2br(htmlspecialchars($item['message'])) . '</div>';
+  $out .= '<ul class="files">';
+  foreach ($item['files'] as $file => $status) {
+    $out .= '<li class="file file-' . strtolower($status) . '">' .
+      '<span class="file-status">' . $status . '</span> ' .
+      '<span class="file-name">' . htmlspecialchars($file) . '</span></li>';
+  }
+  $out .= '</ul>';
+  return $out;
 }
 
 /**
@@ -317,19 +365,18 @@ function _dpgit_theme_log($log) {
 function _dpgit_package($packager, $release) {
   $repo = dproject_working_directory_path($packager);
   $target = dproject_working_directory_path($packager, $release);
+  $metadata = $release->get_metadata_object('git', DPGIT_DPROJECT_NAMESPACE);
 
-  if (file_exists(dirname($target)) || mkdir(dirname($target), 0777, TRUE)) {
-    $out = array();
-    $res = _dpgit_checkout($target, $repo . '/.git', $release->metadata->git->sha1, $out);
-    if (!$res) {
-      dproject_set_packager_message($packager->pid, 'git', 'packaging', 'Failed to pack !sha1 into the directory !dir', array(
-        '!sha1' => $release->metadata->git->sha1,
-        '!dir' => $target,
-      ));
-    }
-    else {
-      return $target;
-    }
+  $out = array();
+  $res = _dpgit_checkout($target, $repo . '/.git', $metadata->sha1, $out);
+  if (!$res) {
+    dproject_set_packager_message($packager->pid, 'git', 'packaging', 'Failed to check out !sha1 to the directory !dir', array(
+      '!sha1' => $metadata->sha1,
+      '!dir' => $target,
+    ));
+  }
+  else {
+    return $target;
   }
 }
 
@@ -348,11 +395,10 @@ function _dpgit_package($packager, $release) {
  *  Returns TRUE on a successful checkout, FALSE on failure
  */
 function _dpgit_checkout($target_dir, $git_dir, $sha1, &$out) {
-  // Make sure that the target dir doesn't exist (by killing it if it does)
-  if (file_exists($target_dir)) {
-    dproject_delete_directory($target_dir);
+  // Make sure that the target dir exists
+  if (!file_exists($target_dir)) {
+    mkdir($target_dir, 0777, TRUE);
   }
-
   $ret = 0;
   exec(_dpgit_shell_command('checkout ' . $sha1 . ' -- ./', $git_dir, $target_dir), $out, $ret);
   return $ret==0;
@@ -445,7 +491,7 @@ function _dpgit_resolve_reference($repository, $reference) {
  */
 function _dpgit_shell_command($command, $git_dir=NULL, $work_dir=NULL) {
   if ($git_dir) {
-    $command = '--git-dir="' . $git_dir . '" ' . $command;
+    $command = '--git-dir="' . realpath($git_dir) . '" ' . $command;
   }
   if ($work_dir) {
     $command = '--work-tree="' . $work_dir . '" ' . $command;

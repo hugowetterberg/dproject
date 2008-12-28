@@ -5,8 +5,6 @@
  * @version $Id$
  **/
 
-define('DPROJECT_NAMESPACE', 'http://goodold.se/project/dproject');
-
 require_once('dproject.api.inc');
 require_once('dproject.token.inc');
 
@@ -302,10 +300,10 @@ function _dproject_create_project_release($form_state, $project_name, $pid) {
 }
 
 /**
- * Helper function used to check if 
+ * Helper function used to check if
  * a value can be treated as a int
  *
- * @param mixed $v 
+ * @param mixed $v
  *  A value that should be checked
  * @return bool
  *  Returns TRUE if the value can be treated as a int
@@ -319,7 +317,7 @@ function _dproject_is_int($v) {
 /**
  * Validates the release creation form
  *
- * @param array $form 
+ * @param array $form
  *  The form array
  * @param array $form_state
  *  The form state
@@ -382,7 +380,7 @@ function _dproject_create_project_release_validate($form, $form_state) {
  * Handles submission of the release creation form
  * and redirects to the confirmation page
  *
- * @param array $form 
+ * @param array $form
  *  The form array
  * @param array $form_state
  *  The form state
@@ -393,8 +391,8 @@ function _dproject_create_project_release_submit($form, $form_state) {
   $packager = dproject_get_project_packager($values['pid']);
   $packager_type = dproject_get_packager_types($packager->packager);
   $project = node_load($packager->nid);
-
   $rel = new DProjectRelease($project);
+  $metadata = $rel->get_metadata_object();
 
   // Make changes in minor version number when necessary
   if ($values['version_extra'] == 'dev' || !_dproject_is_int($values['minor_version']) || $values['minor_version']<0) {
@@ -419,8 +417,8 @@ function _dproject_create_project_release_submit($form, $form_state) {
       $release_type[] = $type;
     }
   }
+  $metadata->terms = $release_type;
 
-  $rel->set_metadata('dproject', DPROJECT_NAMESPACE, (object)array('terms'=>$release_type));
   $rel->set_status(DPROJECT_RELEASE_STATUS_TEMPORARY);
   $rel->save();
 
@@ -433,13 +431,13 @@ function _dproject_create_project_release_submit($form, $form_state) {
 /**
  * Displays a release confirmation page
  *
- * @param array $form 
+ * @param array $form
  *  The form array
  * @param array $form_state
  *  The form state
- * @param string $pid 
+ * @param string $pid
  *  The id of the used packager
- * @param string $rid 
+ * @param string $rid
  *  The if of the release
  * @return void
  */
@@ -455,8 +453,8 @@ function _dproject_confirm_project_release($form_state, $project_name, $pid, $ri
 
   drupal_set_title(t('Confirm release settings for !name', array('!name' => $project->title)));
 
-  $metadata = $rel->get_metadata(DPROJECT_NAMESPACE);
-  
+  $metadata = $rel->get_metadata_object();
+
   // Fill an array with the human readable names
   // of the selected release types
   $rt = array();
@@ -496,9 +494,9 @@ function _dproject_confirm_project_release($form_state, $project_name, $pid, $ri
       '#title' => t('Source description'),
       '#value' => dproject_release_source_description($rel),
     ),
-    // TODO: The cancel link should be rewired to a middle step that deletes the 
+    // TODO: The cancel link should be rewired to a middle step that deletes the
     // temporary release entry, minimizing the cleanup work that cron has to do.
-    'cancel_link' => array( 
+    'cancel_link' => array(
       '#type' => 'markup',
       '#value' => l(t('Cancel'), dproject_project_packagers_path($project)),
     ),
@@ -512,11 +510,81 @@ function _dproject_confirm_project_release($form_state, $project_name, $pid, $ri
 
 function _dproject_project_release_create($form, $form_state) {
   $rel = DProjectRelease::load($form_state['values']['release']);
-  $project = $packager->get_project_node();
-  $packager = dproject_get_project_packager($release->get_packager());
+  $project = $rel->get_project_node();
+  $packager = dproject_get_project_packager($rel->get_packager());
   $packager_type = dproject_get_packager_types($packager->packager);
-  
-  
+
+  $target = call_user_func_array($packager_type['package'], array($packager, $rel));
+
+  $zip = new ZipArchive();
+  $wd = dproject_working_directory_path($packager, $rel);
+  $zip_file = dirname($wd) . '/' . $project->short_name . '-' . $rel->version_string() . '.zip';
+  if ($zip->open($zip_file, ZipArchive::OVERWRITE)) {
+    // Add files to the zip archive
+    $zip->addEmptyDir($project->short_name);
+    _dproject_add_to_release_zip_archive($rel, $zip, $project->short_name, $wd);
+    $zip->close();
+
+    $rel->fileSet($zip_file, NULL, TRUE);
+    $rel->set_status(DPROJECT_RELEASE_STATUS_UNPUBLISHED);
+    $rel->save();
+
+    die;
+  }
+  else {
+    dproject_set_packager_message($packager->pid, 'dproject', 'zip-archive-create', 'Failed to create release zip file !file', array(
+      '!file' => $zip_file,
+    ));
+  }
+}
+
+/**
+ * Recursively adds files to a release zip archive
+ *
+ * @param DProjectRelease $release
+ *  The release object we're adding files for
+ * @param ZipArchive $zip
+ *  A zip archive object
+ * @param string $zip_dir
+ *  The zip directory to add the files to
+ * @param string $dir
+ *  The directory to get files and subdirectories from
+ * @param string $exclude
+ *  An array with regex patterns of filenames to exclude
+ * @return void
+ */
+function _dproject_add_to_release_zip_archive($release, $zip, $zip_dir, $dir, &$exclude=array()) {
+  $dp = opendir($dir);
+  while ($file = readdir($dp)) {
+    if ($file != '.' && $file != '..' && (empty($exclude) || !_dproject_preg_matches_any($file, $exlude))) {
+      if (is_dir($dir . '/' . $file)) { // Recurse into subdirectories
+        $zip->addEmptyDir($zip_dir . '/' . $file);
+        _dproject_add_to_release_zip_archive($release, $zip, $zip_dir . '/' . $file, $dir . '/' . $file, $exclude);
+      }
+      else { // Add files
+        $content = $release->file_alter($dir . '/' . $file);
+        $zip->addFromString($zip_dir . '/' . $file, $content);
+      }
+    }
+  }
+}
+
+/**
+ * Checks if a string matches any of the regex patterns
+ *
+ * @param string $string
+ *  The string to test
+ * @param string $patterns
+ *  The patterns to test against
+ * @return void
+ */
+function _dproject_preg_matches_any($string, $patterns) {
+  foreach($patterns as $pattern) {
+    if (preg_match($pattern, $string)) {
+      return TRUE;
+    }
+  }
+  return FALSE;
 }
 
 function _dproject_ahah_release_source_configuration($pid) {
