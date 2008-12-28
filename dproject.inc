@@ -286,7 +286,42 @@ class DProjectRelease {
       $this->file_path = $release_path;
     }
   }
+  
+  /**
+   * Gets the path of the release file
+   *
+   * @return void
+   */
+  public function get_file_path() {
+    return $this->file_path;
+  }
 
+  /**
+   * Deletes the release and it's file
+   *
+   * @return void
+   */
+  public function delete() {
+    // Delete the release file if it has been set and if it hasn't been
+    // changed since load/creation or is a temporary file
+    if (!empty($this->file_path) && ($this->tmp_file || !$this->file_changed)) {
+      unlink($this->file_path);
+    }
+    
+    // Delete the database entry if this release has a id
+    if ($this->rid) {
+      db_query('DELETE FROM {dproject_release} WHERE rid=%d', array(
+        ':rid' => $this->rid,
+      ));
+    }
+  }
+
+  /**
+   * Saves the release to db and persists any release file that
+   * has been set
+   *
+   * @return void
+   */
   public function save() {
     $this->persist_file();
 

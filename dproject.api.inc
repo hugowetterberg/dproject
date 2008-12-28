@@ -284,23 +284,6 @@ function dproject_set_packager_message($packager_id, $module, $error, $message, 
 }
 
 /**
- * Gets the path to a projects packager page
- *
- * @param stdClass|int $project
- *  The project node or the nid of the project node
- * @return string
- *  The path to the packager page
- */
-function dproject_project_packagers_path($project) {
-  if (is_numeric($project)) {
-    $project = node_load($project);
-  }
-  if (is_object($project)) {
-    return 'project/' . $project->short_name . '/packagers';
-  }
-}
-
-/**
  * Gets the latest release for a project
  *
  * @param stdClass|int $project
