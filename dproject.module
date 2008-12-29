@@ -100,10 +100,6 @@ function _dproject_access($op, $short_name) {
 }
 
 function _dproject_project_packagers($form_state, $node) {
-  drupal_set_title(t('Packagers for !name', array(
-    '!name' => $node->title,
-  )));
-
   $packagers = dproject_get_packager_types();
   $pack_options = array(
     '' => t('--Select a packager')
