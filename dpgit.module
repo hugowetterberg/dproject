@@ -105,6 +105,7 @@ function _dpgit_configure_release(&$release, $packager, $reference) {
   $wd = dproject_working_directory_path($packager);
   $info = _dpgit_resolve_reference($wd . '/.git', $reference);
   $release->add_file_alter('_dpgit_expand_keywords');
+  $release->add_file_exclude('/\.git.*/');
 
   if ($info) {
     $sha1 = $info['sha1'];

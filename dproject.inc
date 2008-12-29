@@ -144,6 +144,95 @@ class DProjectRelease {
   }
 
   /**
+   * Uses the configured packager to set a release file.
+   * Remember to save the release, otherwise the release
+   * file won't be persisted.
+   *
+   * @return bool
+   *  Returns TRUE on success, otherwise FALSE will be returned
+   */
+  public function package() {
+    $packager = dproject_get_project_packager($this->packager);
+    $packager_type = dproject_get_packager_types($packager->packager);
+
+    $target = call_user_func_array($packager_type['package'], array($packager, $this));
+
+    $zip = new ZipArchive();
+    $wd = dproject_working_directory_path($packager, $this);
+    $zip_file = dirname($wd) . '/' . $this->project_node->short_name . '-' . $this->version_string() . '.zip';
+    if ($zip->open($zip_file, ZipArchive::OVERWRITE)) {
+      // Add the project directory to the zip archive
+      $zip->addEmptyDir($this->project_node->short_name);
+      // Recursively add files to the zip archive, excluding all files matching the exclude patterns
+      $this->add_to_release_zip_archive($zip, $this->project_node->short_name, $wd, $this->add_file_exclude());
+      $zip->close();
+
+      $this->set_file($zip_file, NULL, TRUE);
+
+      drupal_set_message(t('A !version release of @project has been created', array(
+        '!version' => $this->version_string(),
+        '@project' => $this->project_node->title,
+      )));
+      return TRUE;
+    }
+    else {
+      dproject_set_packager_message($packager->pid, 'dproject', 'zip-archive-create', 'Failed to create release zip file !file', array(
+        '!file' => $zip_file,
+      ));
+      return FALSE;
+    }
+  }
+
+  /**
+   * Recursively adds files to a release zip archive
+   *
+   * @param DProjectRelease $release
+   *  The release object we're adding files for
+   * @param ZipArchive $zip
+   *  A zip archive object
+   * @param string $zip_dir
+   *  The zip directory to add the files to
+   * @param string $dir
+   *  The directory to get files and subdirectories from
+   * @param string $exclude
+   *  An array with regex patterns of filenames to exclude
+   * @return void
+   */
+  private function add_to_release_zip_archive($zip, $zip_dir, $dir, &$exclude=array()) {
+    $dp = opendir($dir);
+    while ($file = readdir($dp)) {
+      if ($file != '.' && $file != '..' && (empty($exclude) || !$this->preg_matches_any($file, $exclude))) {
+        if (is_dir($dir . '/' . $file)) { // Recurse into subdirectories
+          $zip->addEmptyDir($zip_dir . '/' . $file);
+          $this->add_to_release_zip_archive($zip, $zip_dir . '/' . $file, $dir . '/' . $file, $exclude);
+        }
+        else { // Add files
+          $content = $this->file_alter($dir . '/' . $file);
+          $zip->addFromString($zip_dir . '/' . $file, $content);
+        }
+      }
+    }
+  }
+
+  /**
+   * Checks if a string matches any of the regex patterns
+   *
+   * @param string $string
+   *  The string to test
+   * @param string $patterns
+   *  The patterns to test against
+   * @return void
+   */
+  public function preg_matches_any($string, $patterns) {
+    foreach($patterns as $pattern) {
+      if (preg_match($pattern, $string)) {
+        return TRUE;
+      }
+    }
+    return FALSE;
+  }
+
+  /**
    * Sets the release file path so that it can be stored when the release is saved.
    *
    * @param string $file_path
@@ -162,7 +251,7 @@ class DProjectRelease {
    * @return void
    *  This function doesn't use return values for results. A DProjectException is thrown on failure.
    **/
-  public function fileSet($file_path, $md5=NULL, $tmp_file=FALSE) {
+  public function set_file($file_path, $md5=NULL, $tmp_file=FALSE) {
     //Check release file md5 checksum
     $file_md5 = md5_file($file_path);
     if (!empty($md5) && $file_md5 != $md5) {
@@ -194,7 +283,7 @@ class DProjectRelease {
    *
    * @return void This function doesn't use return values for results. A DProjectException is thrown on failure.
    **/
-  public function fileLoad($source_file, $md5=NULL) {
+  public function load_file($source_file, $md5=NULL) {
     try {
       // Open the source release file for reading
       $sfp = fopen($source_file, 'r');
@@ -286,7 +375,7 @@ class DProjectRelease {
       $this->file_path = $release_path;
     }
   }
-  
+
   /**
    * Gets the path of the release file
    *
@@ -307,7 +396,7 @@ class DProjectRelease {
     if (!empty($this->file_path) && ($this->tmp_file || !$this->file_changed)) {
       unlink($this->file_path);
     }
-    
+
     // Delete the database entry if this release has a id
     if ($this->rid) {
       db_query('DELETE FROM {dproject_release} WHERE rid=%d', array(
@@ -575,10 +664,10 @@ class DProjectRelease {
   }
 
   /**
-   * Used to add file alters
+   * Used to add to and get the file alter callbacks
    *
    * @param string $callback
-   *
+   *  Optional. Omit if you just want to get a list of the alter callbacks
    * @return array
    *  Returns the registered file alters
    */
@@ -587,8 +676,33 @@ class DProjectRelease {
     if (!isset($metadata->file_alters)) {
       $metadata->file_alters = array();
     }
-    $metadata->file_alters[] = $callback;
+    if ($callback) {
+      foreach ((array)$callback as $cb) {
+        $metadata->file_alters[] = $cb;
+      }
+    }
     return $metadata->file_alters;
+  }
+
+  /**
+   * Used to add to and get the file exclude patterns
+   *
+   * @param string $exclude
+   *  Optional. Omit if you just want a list of the exclude patterns
+   * @return array
+   *  Returns the registered file excludes
+   */
+  public function add_file_exclude($exclude=NULL) {
+    $metadata = $this->get_metadata_object();
+    if (!isset($metadata->file_excludes)) {
+      $metadata->file_excludes = array();
+    }
+    if ($exclude) {
+      foreach ((array)$exclude as $ex) {
+        $metadata->file_excludes[] = $ex;
+      }
+    }
+    return $metadata->file_excludes;
   }
 
   /**
