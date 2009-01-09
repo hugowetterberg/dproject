@@ -553,7 +553,7 @@ function _dpgit_tags($repository) {
  */
 function _dpgit_recent_commits($packager) {
   $wdir = dproject_working_directory_path($packager);
-  $log = _dpgit_log($wdir . '/.git', 20);
+  $log = _dpgit_log($wdir . '/.git', 20, 'origin/master');
 
   $recent_commits = array();
   foreach ($log as $sha1 => $info) {
