@@ -17,10 +17,10 @@ define('DPROJECT_VALIDATION_ERROR', 400);
 
 // Release status codes
 define('DPROJECT_RELEASE_STATUS_TEMPORARY', 0); // Temporary releases will be deleted within one hour of creation
-define('DPROJECT_RELEASE_STATUS_UNPUBLISHED', 1);
-define('DPROJECT_RELEASE_STATUS_UNSUPPORTED', 2);
-define('DPROJECT_RELEASE_STATUS_SUPPORTED', 3);
-define('DPROJECT_RELEASE_STATUS_RECOMMENDED', 4); // Recommended releases are always supported
+                                                // TODO: Implement auto-deletion of temporary releases
+define('DPROJECT_RELEASE_STATUS_UNSUPPORTED', 1);
+define('DPROJECT_RELEASE_STATUS_SUPPORTED', 2);
+define('DPROJECT_RELEASE_STATUS_RECOMMENDED', 3); // Recommended releases are always supported
 
 /**
  * A class for release management
@@ -33,7 +33,8 @@ class DProjectRelease {
   private $major_version = 1;
   private $minor_version = 0;
   private $version_extra = '';
-  private $status = DPROJECT_RELEASE_STATUS_UNPUBLISHED;
+  private $status = DPROJECT_RELEASE_STATUS_SUPPORTED;
+  private $published = 0;
   private $created = 0;
 
   private $file_changed = FALSE;
@@ -91,10 +92,28 @@ class DProjectRelease {
    *  A project release object or FALSE if no release with the provided $rid exists
    **/
   public static function load($rid, $project_node=NULL) {
-    $res = db_query("SELECT rid, project_nid, api_version, major_version, minor_version,
-        version_extra, status, packager, created, file_path, md5, release_metadata
+    $res = db_query("SELECT *
       FROM {dproject_release}
       WHERE rid = %d", $rid);
+    return load_from_result($res, $project_node);
+  }
+  
+  /**
+   * Loads a project release from a result resource
+   *
+   * @param $res
+   *  The result resource
+   * @param stdClass $project_node
+   *  Optional node to use as project node, this must match the project_nid in the database
+   *
+   * @throws DProjectException
+   *  Throws a DProjectException when the $project_node cannot be used because of a
+   *  nid mismatch or when the project node cannot be loaded.
+   *
+   * @return DProjectRelease
+   *  A project release object or FALSE if nothing could be fetched from the result resource
+   **/
+  public static function load_from_result($res, $project_node=NULL) {
     // Get the state as an array so that we can use DProjectRelease::__set_state to create the release object
     if ($state = db_fetch_array($res)) {
       // Decode the metadata and map it to the correct state key, unset the old value
@@ -616,6 +635,32 @@ class DProjectRelease {
    */
   public function get_status() {
     return $this->status;
+  }
+  
+  /**
+   * Sets the published state of this release
+   * The release will not be published if the release
+   * has the status DPROJECT_RELEASE_STATUS_TEMPORARY
+   *
+   * @param bool $published
+   *  The published state of the release
+   * @return void
+   */
+  public function set_published($published) {
+    if ($this->state == DPROJECT_RELEASE_STATUS_TEMPORARY) {
+      $published = FALSE;
+    }
+    $this->published = $published;
+  }
+
+  /**
+   * Gets the status of this release
+   *
+   * @return int
+   *  The status of this release
+   */
+  public function get_published() {
+    return $this->published;
   }
 
   /**
