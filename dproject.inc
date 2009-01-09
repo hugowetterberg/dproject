@@ -503,8 +503,9 @@ class DProjectRelease {
   /**
    * Sets all version information for the release
    *
-   * @param int $api
-   *  The drupal api version
+   * @param int|array $api
+   *  The drupal api version or an array containing all the version information.
+   *  If an array is passed all the following paramaters can be ignored.
    * @param int $major
    *  The major version of the release
    * @param int $minor
@@ -513,11 +514,31 @@ class DProjectRelease {
    *  The extra version information (dev, beta, and so on)
    * @return void
    */
-  public function set_version($api, $major, $minor, $extra=NULL) {
+  public function set_version($api, $major=NULL, $minor=NULL, $extra=NULL) {
+    // Unpack version information if we got it as an array
+    if (is_array($api)) {
+      list($api, $major, $minor, $extra) = $api;
+    }
+    
     $this->api_version = $api;
     $this->major_version = $major;
     $this->minor_version = $extra!='dev' ? $minor : NULL;
     $this->version_extra = $extra;
+  }
+
+  /**
+   * Gets version information as an array containing the
+   * api, major, minor and extra version information.
+   *
+   * @return array
+   */
+  public function get_version() {
+    return array(
+      $this->api_version,
+      $this->major_version,
+      $this->minor_version,
+      $this->version_extra,
+    );
   }
 
   /**
