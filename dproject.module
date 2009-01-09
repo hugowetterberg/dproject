@@ -293,6 +293,20 @@ function _dproject_create_project_release($form_state, $project, $pid) {
     '#required' => TRUE,
   );
 
+  $status_options = array(
+    'unsupported' => t('Unsupported'),
+    'supported' => t('Supported'),
+    'excl_supported' => t('Exclusively supported'),
+    'recommended' => t('Recommended'),
+    'excl_recommended' => t('Recommended and exclusively supported'),
+  );
+  
+  $form['release_status'] = array(
+    '#type' => 'select',
+    '#title' => t('Release status'),
+    '#options' => $status_options,
+  );
+
   $form['#validate'] = array('_dproject_create_project_release_validate');
   $form['#submit'] = array('_dproject_create_project_release_submit');
   $form['submit'] = array(
@@ -422,8 +436,31 @@ function _dproject_create_project_release_submit($form, $form_state) {
     }
   }
   $metadata->terms = $release_type;
+  
+  // Check if this new release is exclusively supported
+  if (substr_compare($values['release_status'], 'excl_', 0, 5)) {
+    $metadata->exclusively_supported = TRUE;
+    $values['release_status'] = substr($values['release_status'], 5);
+  }
+  
+  // Interpret the release status value
+  $status = $rel->get_status();
+  switch ($values['release_status']) {
+    case 'unsupported': 
+      $status = DPROJECT_RELEASE_STATUS_UNSUPPORTED;
+    break;
+    case 'supported':
+      $status = DPROJECT_RELEASE_STATUS_SUPPORTED;
+    break;
+    case 'recommended':
+      $status = DPROJECT_RELEASE_STATUS_RECOMMENDED;
+    break;
+  }
 
-  $rel->set_status(DPROJECT_RELEASE_STATUS_TEMPORARY);
+  // Set release state and save it
+  $rel->set_status($status);
+  $rel->set_published(FALSE);
+  $rel->set_temporary(TRUE);
   $rel->save();
 
   $rid = $rel->get_id();
@@ -456,6 +493,7 @@ function _dproject_confirm_project_release($form_state, $project, $pid, $rid) {
   drupal_set_title(t('Confirm release settings for !name', array('!name' => $project->title)));
 
   $metadata = $rel->get_metadata_object();
+  $version = $rel->get_version();
 
   // Fill an array with the human readable names
   // of the selected release types
@@ -466,35 +504,59 @@ function _dproject_confirm_project_release($form_state, $project, $pid, $rid) {
       $rt[] = $release_types[$term];
     }
   }
+  
+  switch ($rel->get_status()) {
+    case DPROJECT_RELEASE_STATUS_UNSUPPORTED:
+      $status = t('Unsupported');
+    break;
+    case DPROJECT_RELEASE_STATUS_SUPPORTED:
+      $status = t('Supported');
+    break;
+    case DPROJECT_RELEASE_STATUS_RECOMMENDED:
+      $status = t('Recommended');
+    break;
+  }
 
-  return array(
+  $form = array(
     '#id' => 'dproject-confirm-release-configuration-form',
+    '#submit' => array('_dproject_project_release_create'),
     'release' => array(
       '#type' => 'value',
       '#value' => $rel->get_id(),
     ),
     'intro_text' => array(
       '#value' => '<p>' . t('Please confirm that the release version is correct and that the source is properly configured before creating the release') . '</p>',
+      '#weight' => -10,
     ),
     'version' => array(
       '#type' => 'item',
       '#title' => t('Version'),
       '#value' => $rel->version_string(),
+      '#weight' => -8,
+    ),
+    'release_status' => array(
+      '#type' => 'item',
+      '#title' => t('Release status'),
+      '#value' => $status,
+      '#weight' => -8,
     ),
     'release_type' => array(
       '#type' => 'item',
       '#title' => t('Release type'),
       '#value' => join($rt, '<br/>'),
+      '#weight' => -8,
     ),
     'packager_description' => array(
       '#type' => 'item',
       '#title' => t('Packager (@name)', array('@name' => $packager->packager)),
       '#value' => dproject_packager_description($packager),
+      '#weight' => -5,
     ),
     'source_description' => array(
       '#type' => 'item',
       '#title' => t('Source description'),
       '#value' => dproject_release_source_description($rel),
+      '#weight' => -5,
     ),
     // TODO: The cancel link should be rewired to a middle step that deletes the
     // temporary release entry, minimizing the cleanup work that cron has to do.
@@ -502,19 +564,33 @@ function _dproject_confirm_project_release($form_state, $project, $pid, $rid) {
       '#type' => 'markup',
       '#value' => l(t('Cancel'), 'node/' . $project->nid),
     ),
-    '#submit' => array('_dproject_project_release_create'),
     'submit' => array(
       '#type' => 'submit',
       '#value' => t('Create release'),
+      '#weight' => 10,
     ),
   );
+  
+  if (isset($metadata->exclusively_supported) && $metadata->exclusively_supported) {
+    $form['exclusive'] = array(
+      '#type' => 'item',
+      '#title' => t('Exclusivity'),
+      '#value' => t('This release has been marked as exclusively supported. All releases for Drupal !api_version with a lower version number will therefore be marked as unsupported.', array(
+        '!api_version' => $version[0],
+      )),
+      '#weight' => -7,
+    );
+  }
+  
+  return $form;
 }
 
 function _dproject_project_release_create($form, $form_state) {
   $release = DProjectRelease::load($form_state['values']['release']);
 
   $release->package();
-  $release->set_status(DPROJECT_RELEASE_STATUS_UNPUBLISHED);
+  $release->set_published(TRUE);
+  $release->set_temporary(FALSE);
   $release->save();
 
   $node = $release->get_project_node();

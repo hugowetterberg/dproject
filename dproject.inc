@@ -16,11 +16,9 @@ define('DPROJECT_DB_INTEGRITY_ERROR', 300);
 define('DPROJECT_VALIDATION_ERROR', 400);
 
 // Release status codes
-define('DPROJECT_RELEASE_STATUS_TEMPORARY', 0); // Temporary releases will be deleted within one hour of creation
-                                                // TODO: Implement auto-deletion of temporary releases
-define('DPROJECT_RELEASE_STATUS_UNSUPPORTED', 1);
-define('DPROJECT_RELEASE_STATUS_SUPPORTED', 2);
-define('DPROJECT_RELEASE_STATUS_RECOMMENDED', 3); // Recommended releases are always supported
+define('DPROJECT_RELEASE_STATUS_UNSUPPORTED', 0);
+define('DPROJECT_RELEASE_STATUS_SUPPORTED', 1);
+define('DPROJECT_RELEASE_STATUS_RECOMMENDED', 2); // Recommended releases are always supported
 
 /**
  * A class for release management
@@ -34,7 +32,8 @@ class DProjectRelease {
   private $minor_version = 0;
   private $version_extra = '';
   private $status = DPROJECT_RELEASE_STATUS_SUPPORTED;
-  private $published = 0;
+  private $temporary = FALSE; // TODO: Implement auto-deletion of temporary releases
+  private $published = FALSE;
   private $created = 0;
 
   private $file_changed = FALSE;
@@ -95,9 +94,9 @@ class DProjectRelease {
     $res = db_query("SELECT *
       FROM {dproject_release}
       WHERE rid = %d", $rid);
-    return load_from_result($res, $project_node);
+    return DProjectRelease::load_from_result($res, $project_node);
   }
-  
+
   /**
    * Loads a project release from a result resource
    *
@@ -442,6 +441,8 @@ class DProjectRelease {
       'created' => $this->created,
       'packager' => $this->packager,
       'status' => $this->status,
+      'published' => $this->published,
+      'temporary' => $this->temporary,
       'file_path' => $this->file_path,
       'md5' => $this->md5,
       'release_metadata' => json_encode($this->metadata),
@@ -538,7 +539,7 @@ class DProjectRelease {
     if (is_array($api)) {
       list($api, $major, $minor, $extra) = $api;
     }
-    
+
     $this->api_version = $api;
     $this->major_version = $major;
     $this->minor_version = $extra!='dev' ? $minor : NULL;
@@ -636,31 +637,47 @@ class DProjectRelease {
   public function get_status() {
     return $this->status;
   }
-  
+
   /**
    * Sets the published state of this release
-   * The release will not be published if the release
-   * has the status DPROJECT_RELEASE_STATUS_TEMPORARY
    *
    * @param bool $published
    *  The published state of the release
    * @return void
    */
   public function set_published($published) {
-    if ($this->state == DPROJECT_RELEASE_STATUS_TEMPORARY) {
-      $published = FALSE;
-    }
     $this->published = $published;
   }
 
   /**
-   * Gets the status of this release
+   * Gets the published status of this release.
    *
-   * @return int
-   *  The status of this release
+   * @return bool
+   *  The published status of this release
    */
   public function get_published() {
     return $this->published;
+  }
+
+  /**
+   * Sets the temporary state of this release
+   *
+   * @param bool $published
+   *  The published state of the release
+   * @return void
+   */
+  public function set_temporary($temporary) {
+    $this->temporary = $temporary;
+  }
+
+  /**
+   * Gets the temporary state of this release
+   *
+   * @return bool
+   *  Returns TRUE if this release is temporary, otherwise FALSE is returned
+   */
+  public function get_temporary() {
+    return $this->temporary;
   }
 
   /**

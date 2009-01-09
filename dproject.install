@@ -221,6 +221,13 @@ function dproject_schema() {
         'not null' => TRUE,
         'default' => 0,
       ),
+      'temporary' => array(
+        'description' => t('Whether this is a temporary release'),
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+      ),
       'file_path' => array(
         'description' => t('The path to the release file'),
         'type' => 'varchar',
@@ -245,6 +252,8 @@ function dproject_schema() {
       'project' => array('project_nid'),
       'version' => array('api_version', 'major_version', 'minor_version', 'version_extra'),
       'status' => array('status'),
+      'published' => array('published', 'temporary'),
+      'hash' => array('md5')
     ),
     'primary key' => array('rid'),
   );
