@@ -288,21 +288,168 @@ function dproject_set_packager_message($packager_id, $module, $error, $message, 
  *
  * @param stdClass|int $project
  *  The project node or the nid of the project node
- * @return string
+ * @return DProjectRelease
  *  The release object for the latest release
  */
 function dproject_get_latest_release($project) {
   if (is_object($project)) {
-    $project = $project->nid;
+    $node = $project;
+  }
+  else {
+    $node = node_load($project);
   }
 
-  if (is_int($project)) {
-    $res = db_query("SELECT rid FROM {dproject_release}
+  if ($node) {
+    $res = db_query_range("SELECT * FROM {dproject_release}
       WHERE project_nid=%d
-      ORDER BY api_version DESC, major_version DESC, minor_version DESC, creates DESC");
-    if ($o = db_fetch_object($res)) {
-      return DProjectRelease::load($o->rid);
+      ORDER BY api_version DESC, major_version DESC, minor_version DESC, version_extra DESC, created DESC", array(
+        ':nid' => $node->nid,
+      ), 0, 1);
+    return DProjectRelease::load_from_result($res, $node);
+  }
+
+  return FALSE;
+}
+
+/**
+ * Gets the recommended release for a project
+ *
+ * @param stdClass|int $project
+ *  The project node or the nid of the project node
+ * @param int $api_version
+ *  The api version to get the recommended release for
+ * @return DProjectRelease
+ *  The release object for the latest release
+ */
+function dproject_get_recommended_release($project, $api_version) {
+  if (is_object($project)) {
+    $node = $project;
+  }
+  else {
+    $node = node_load($project);
+  }
+
+  if ($node) {
+    $res = db_query("SELECT * FROM {dproject_release}
+      WHERE project_nid=%d
+      AND status=%d
+      AND api_version=%d", array(
+        ':nid' => $node->nid,
+        ':status' => DPROJECT_RELEASE_STATUS_RECOMMENDED,
+        ':api' => $api_version,
+      ));
+    return DProjectRelease::load_from_result($res, $node);
+  }
+
+  return FALSE;
+}
+
+/**
+ * Gets the major versions of supported releases for a project
+ *
+ * @param stdClass|int $project
+ *  The project node or the nid of the project node
+ * @param int $api_version
+ *  The api version to get the recommended release for
+ * @return array
+ *  An array with the major versions
+ */
+function dproject_get_supported_major_versions($project, $api_version) {
+  if (is_object($project)) {
+    $node = $project;
+  }
+  else {
+    $node = node_load($project);
+  }
+  
+  $versions = array();
+
+  if ($node) {
+    $res = db_query("SELECT DISTINCT major_version FROM {dproject_release}
+      WHERE project_nid=%d
+      AND status>=%d
+      AND api_version=%d", array(
+        ':nid' => $node->nid,
+        ':status' => DPROJECT_RELEASE_STATUS_SUPPORTED,
+        ':api' => $api_version,
+      ));
+      
+    while (($major=db_result($res))!==NULL) {
+      $versions[] = $major;
     }
+  }
+
+  return $versions;
+}
+
+/**
+ * Changes the status of a release.
+ *
+ * TODO: Look at options for creating a audit trail for dproject
+ *
+ * @param string $rid 
+ * @param string $status 
+ * @return void
+ */
+function dproject_change_release_status($rid, $status) {
+  db_query("UPDATE {dproject_release} SET status=%d WHERE rid=%d", array(
+    ':status' => $status,
+    ':rid' => $rid,
+  ));
+}
+
+/**
+ * Gets the latest n releases for the specified api version
+ *
+ * @param stdClass|int $project
+ *  The project node or the nid of the project node
+ * @param int $api_version
+ * @param string $count
+ * @return void
+ */
+function dproject_get_releases($project, $api_version=0, $count=0) {
+  if (is_object($project)) {
+    $node = $project;
+  }
+  else {
+    $node = node_load($project);
+  }
+
+  if ($node) {
+    $releases = array();
+    
+    $params = array(
+      ':nid' => $node->nid
+    );
+    
+    if ($api_version) {
+      $version_sql = 'AND api_version=%d';
+      $params[':api_version'] = $api_version;
+    }
+    else {
+      $version_sql = '';
+    }
+  
+    $args = array("SELECT * FROM {dproject_release}
+      WHERE project_nid=%d
+      {$version_sql}
+      ORDER BY api_version DESC, major_version DESC, minor_version DESC, version_extra DESC, created DESC",
+      $params);
+    
+    if ($count) {
+      $query_func = 'db_query_range';
+      $args[] = 0;
+      $args[] = $count;
+    }
+    else {
+      $query_func = 'db_query';
+    }
+    
+    $res = call_user_func_array($query_func, $args);
+    while ($rel = DProjectRelease::load_from_result($res, $node)) {
+      $releases[] = $rel;
+    }
+    return $releases;
   }
 
   return FALSE;
