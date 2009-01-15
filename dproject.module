@@ -47,15 +47,25 @@ function dproject_menu() {
 
   $items['node/%node/packagers'] = array(
     'title' => 'Packagers',
-    'page callback' => 'drupal_get_form',
-    'page arguments' => array('_dproject_project_packagers', 1),
+    'page callback' => '_dproject_packagers_redirect',
+    'page arguments' => array(1),
     'access callback' => '_dproject_node_access',
     'access arguments' => array(1, 'edit'),
     'type' => MENU_LOCAL_TASK,
     'weight' => 2,
   );
 
-  $items['node/%node/packagers/%/delete'] = array(
+  $items['project/%dprojectnode/packagers'] = array(
+    'title' => 'Packagers',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('_dproject_project_packagers', 1),
+    'access callback' => '_dproject_node_access',
+    'access arguments' => array(1, 'edit'),
+    'type' => MENU_NORMAL_ITEM,
+    'weight' => 2,
+  );
+
+  $items['project/%dprojectnode/packagers/%/delete'] = array(
     'title' => t('Delete project packager'),
     'page callback' => 'drupal_get_form',
     'page arguments' => array('_dproject_delete_project_packager', 1, 3),
@@ -64,7 +74,7 @@ function dproject_menu() {
     'type' => MENUITEM_CALLBACK,
   );
 
-  $items['node/%node/packagers/%/update'] = array(
+  $items['project/%dprojectnode/packagers/%/update'] = array(
     'title' => t('Update'),
     'page callback' => '_dproject_update_project_packager',
     'page arguments' => array(1, 3),
@@ -73,7 +83,7 @@ function dproject_menu() {
     'type' => MENUITEM_CALLBACK,
   );
 
-  $items['node/%node/packagers/%/release'] = array(
+  $items['project/%dprojectnode/packagers/%/release'] = array(
     'title' => t('Create a project release'),
     'page callback' => 'drupal_get_form',
     'page arguments' => array('_dproject_create_project_release', 1, 3),
@@ -82,7 +92,7 @@ function dproject_menu() {
     'type' => MENUITEM_CALLBACK,
   );
 
-  $items['node/%node/packagers/%/release/confirm/%'] = array(
+  $items['project/%dprojectnode/packagers/%/release/confirm/%'] = array(
     'title' => t('Confirm project release'),
     'page callback' => 'drupal_get_form',
     'page arguments' => array('_dproject_confirm_project_release', 1, 3, 6),
@@ -91,7 +101,36 @@ function dproject_menu() {
     'type' => MENUITEM_CALLBACK,
   );
 
+  $items['project/%dprojectnode/release-history/%'] = array(
+    'page callback' => '_dproject_feed_generate',
+    'page arguments' => array(1, 3),
+    'file' => 'dproject.feed.inc',
+    'access callback' => '_dproject_node_access',
+    'access arguments' => array(1, 'view'),
+    'type' => MENUITEM_CALLBACK,
+  );
+  
+  $items['release-history/%dprojectnode/%'] = array(
+    'page callback' => '_dproject_feed_generate',
+    'page arguments' => array(1, 2),
+    'file' => 'dproject.feed.inc',
+    'access callback' => '_dproject_node_access',
+    'access arguments' => array(1, 'view'),
+    'type' => MENUITEM_CALLBACK,
+  );
+
   return $items;
+}
+
+/**
+ * Menu system wildcard loader for %dprojectnode
+ * allowing projects to be referenced by name
+ *
+ * @param string $short_name 
+ * @return stdClass
+ */
+function dprojectnode_load($short_name) {
+  return dproject_get_project_by_name($short_name);
 }
 
 /**
@@ -114,7 +153,20 @@ function _dproject_node_access($node, $op) {
   return FALSE;
 }
 
+function _dproject_packagers_redirect($node) {
+  drupal_goto('project/' . $node->short_name . '/packagers/');
+  die;
+}
+
 function _dproject_project_packagers($form_state, $node) {
+  drupal_set_breadcrumb(array(
+    l(t('Home'), '<front>'),
+    l($node->title, 'node/' . $node->nid),
+  ));
+  drupal_set_title(t('!title packagers', array(
+    '!title' => $node->title,
+  )));
+  
   $packagers = dproject_get_packager_types();
   $pack_options = array(
     '' => t('--Select a packager')
@@ -132,12 +184,12 @@ function _dproject_project_packagers($form_state, $node) {
     $po .= '</div>';
 
     $packager_links = array(
-      l(t('Create a release'), 'node/' . $node->nid . '/packagers/' . $p->pid . '/release', array(
+      l(t('Create a release'), 'project/' . $node->short_name . '/packagers/' . $p->pid . '/release', array(
         'attributes' => array(
           'class' => 'package',
         ),
       )),
-      l(t('Remove'), 'node/' . $node->nid . '/packagers/' . $p->pid . '/delete', array(
+      l(t('Remove'), 'project/' . $node->short_name . '/packagers/' . $p->pid . '/delete', array(
         'attributes' => array(
           'class' => 'delete',
         ),
@@ -146,7 +198,7 @@ function _dproject_project_packagers($form_state, $node) {
 
     // Add a update link if it's supported by the packager type
     if (isset($packagers[$p->packager]['update'])) {
-      $packager_links[] = l(t('Update'), 'node/' . $node->nid . '/packagers/' . $p->pid . '/update', array(
+      $packager_links[] = l(t('Update'), 'project/' . $node->short_name . '/packagers/' . $p->pid . '/update', array(
         'attributes' => array(
           'class' => 'update',
         ),
@@ -225,7 +277,7 @@ function _dproject_create_project_release($form_state, $project, $pid) {
   drupal_set_breadcrumb(array(
     l(t('Home'), '<front>'),
     l($project->title, 'node/' . $project->nid),
-    l('Packagers', 'node/' . $project->nid . '/packagers'),
+    l('Packagers', 'project/' . $project->short_name . '/packagers'),
   ));
 
   $form = array();
@@ -438,7 +490,7 @@ function _dproject_create_project_release_submit($form, $form_state) {
   $metadata->terms = $release_type;
   
   // Check if this new release is exclusively supported
-  if (substr_compare($values['release_status'], 'excl_', 0, 5)) {
+  if (substr($values['release_status'], 0, 5)=='excl_') {
     $metadata->exclusively_supported = TRUE;
     $values['release_status'] = substr($values['release_status'], 5);
   }
@@ -466,7 +518,7 @@ function _dproject_create_project_release_submit($form, $form_state) {
   $rid = $rel->get_id();
 
   // Send the user to the confirmation page
-  drupal_goto("node/{$project->nid}/packagers/{$packager->pid}/release/confirm/{$rid}");
+  drupal_goto("project/{$project->short_name}/packagers/{$packager->pid}/release/confirm/{$rid}");
 }
 
 /**
@@ -588,10 +640,47 @@ function _dproject_confirm_project_release($form_state, $project, $pid, $rid) {
 function _dproject_project_release_create($form, $form_state) {
   $release = DProjectRelease::load($form_state['values']['release']);
 
-  $release->package();
+  //$release->package();
   $release->set_published(TRUE);
   $release->set_temporary(FALSE);
   $release->save();
+  
+  $metadata = $release->get_metadata_object();
+  $v = $release->get_version();
+  // Set preceding releases with the same api-version as unsupported
+  // if this release should be exclusively supported.
+  if (isset($metadata->exclusively_supported) && $metadata->exclusively_supported) {
+    // The reason that we get the id's of the releases that should be marked
+    // as unsupported instead of directly updating the table is that we want to make all
+    // changes through the api. This opens up for adding stuff like a audit trail later.
+    $res = db_query("SELECT rid FROM {dproject_release}
+      WHERE api_version=%d
+      AND rid!=%d
+      AND status!=%d", array(
+        ':api' => $v[0],
+        ':rid' => $release->get_id(),
+        ':status' => DPROJECT_RELEASE_STATUS_UNSUPPORTED,
+    ));
+    while ($urid = db_result($res)) {
+      dproject_change_release_status($urid, DPROJECT_RELEASE_STATUS_UNSUPPORTED);
+    }
+  }
+  // Make sure that only one release for this api version is marked as recommended.
+  // If the release was marked as exclusively supported this has already been taken
+  // care of.
+  else if ($release->get_status()==DPROJECT_RELEASE_STATUS_RECOMMENDED) {
+    $res = db_query("SELECT rid FROM {dproject_release}
+      WHERE api_version=%d
+      AND rid!=%d
+      AND status=%d", array(
+        ':api' => $v[0],
+        ':rid' => $release->get_id(),
+        ':status' => DPROJECT_RELEASE_STATUS_RECOMMENDED,
+    ));
+    while ($urid = db_result($res)) {
+      dproject_change_release_status($urid, DPROJECT_RELEASE_STATUS_SUPPORTED);
+    }
+  }
 
   $node = $release->get_project_node();
   drupal_goto('node/' . $node->nid);
@@ -625,7 +714,7 @@ function _dproject_update_project_packager($node, $pid) {
   if (isset($ptype['update'])) {
     call_user_func($ptype['update'], $p);
   }
-  drupal_goto('node/' . $node->nid . '/packagers');
+  drupal_goto('project/' . $node->short_name . '/packagers');
 }
 
 function _dproject_delete_project_packager($form_state, $node, $pid) {
@@ -649,7 +738,7 @@ function _dproject_delete_project_packager($form_state, $node, $pid) {
       ),
       'cancel_link' => array(
         '#type' => 'markup',
-        '#value' => l(t('No, cancel this action'), 'node/' . $p->nid . '/packagers'),
+        '#value' => l(t('No, cancel this action'), 'project/' . $node->short_name . '/packagers'),
       ),
       'submit' => array(
         '#type' => 'submit',
@@ -667,7 +756,8 @@ function _dproject_delete_project_packager_confirmed($form, $form_state) {
   $p = dproject_get_project_packager($pid);
   if ($p) {
     dproject_delete_project_packager($p);
-    drupal_goto('node/' . $p->nid . '/packagers');
+    $node = node_load($p->nid);
+    drupal_goto('project/' . $node->short_name . '/packagers');
   }
   else {
     drupal_not_found();
