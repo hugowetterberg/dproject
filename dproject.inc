@@ -402,6 +402,24 @@ class DProjectRelease {
   public function get_file_path() {
     return $this->file_path;
   }
+  
+  /**
+   * Gets the created timestamp of the release
+   *
+   * @return void
+   */
+  public function get_created() {
+    return $this->created;
+  }
+  
+  /**
+   * Gets the md5 hash of the release file
+   *
+   * @return void
+   */
+  public function get_md5() {
+    return $this->md5;
+  }
 
   /**
    * Deletes the release and it's file
@@ -744,6 +762,24 @@ class DProjectRelease {
       return $obj->data;
     }
     return FALSE;
+  }
+  
+  /**
+   * Returns all metadata as a list
+   *
+   * @return array
+   */
+  public function get_metadata_list() {
+    $metadata = get_object_vars($this->metadata);
+    $list = array();
+    foreach ($metadata as $name => $cont) {
+      $list[] = (object)array(
+        'name' => $name,
+        'namespace' => $cont->namespace,
+        'data' => $cont->data,
+      );
+    }
+    return $list;
   }
 
   /**
