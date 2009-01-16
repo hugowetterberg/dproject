@@ -13,8 +13,56 @@
 function dproject_views_data() {
   $data = array();
 
-//TODO: Status, Packager, Metadata
 //TODO: Try to create link as: project/%dprojectnode/releases/%
+
+  /* dProject */
+
+  $data['dproject']['table']['group']  = t('dProject');
+
+  $data['dproject']['table']['join'] = array(
+    'node' => array(
+      'left_field' => 'nid',
+      'field' => 'nid',
+    ),
+  );
+
+  $data['dproject']['short_name'] = array(
+    'title' => t('Short name'),
+    'help' => t('The short project name'),
+    'field' => array(
+      'handler' => 'views_handler_field',
+      'click sortable' => TRUE,
+    ),
+    'argument' => array(
+      'handler' => 'views_handler_argument_string',
+    ),
+    'filter' => array(
+      'handler' => 'views_handler_filter_string',
+    ),
+    'sort' => array(
+      'handler' => 'views_handler_sort',
+    ),
+  );
+
+  $data['dproject']['description'] = array(
+    'title' => t('Project description'),
+    'help' => t('Project description'),
+    'field' => array(
+      'handler' => 'views_handler_field',
+      'click sortable' => TRUE,
+    ),
+    'argument' => array(
+      'handler' => 'views_handler_argument_string',
+    ),
+    'filter' => array(
+      'handler' => 'views_handler_filter_string',
+    ),
+    'sort' => array(
+      'handler' => 'views_handler_sort',
+    ),
+  );
+
+  /* dProject Release */
 
   $data['dproject_release']['table']['group']  = t('dProject Release');
 
