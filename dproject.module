@@ -328,31 +328,36 @@ function _dproject_create_project_release($form_state, $project, $pid) {
     ),
   );
 
+  $version = FALSE;
+  if ($last_release) {
+    $version = $last_release->get_version();
+  }
+  
   $form['api_version'] = array(
     '#type' => 'textfield',
     '#title' => t('Api version'),
-    '#default_value' => $last_release ? $last_release->api_version : 6,
+    '#default_value' => $version ? $version[0] : 6,
     '#required' => TRUE,
   );
 
   $form['major_version'] = array(
     '#type' => 'textfield',
     '#title' => t('Major version'),
-    '#default_value' => $last_release ? $last_release->major_version : 1,
+    '#default_value' => $version ? $version[1] : 1,
     '#required' => TRUE,
   );
 
   $form['minor_version'] = array(
     '#type' => 'textfield',
     '#title' => t('Minor version'),
-    '#default_value' => $last_release ? $last_release->minor_version : 0,
+    '#default_value' => $version ? $version[2] : 0,
     '#required' => TRUE,
   );
 
   $form['version_extra'] = array(
     '#type' => 'textfield',
     '#title' => t('Version extra'),
-    '#default_value' => $last_release ? $last_release->version_extra : '',
+    '#default_value' => $version ? $version[3] : '',
   );
 
   $form['release_type'] = array(
