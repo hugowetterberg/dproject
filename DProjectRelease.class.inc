@@ -159,7 +159,7 @@ class DProjectRelease {
     $zip = new ZipArchive();
     $wd = dproject_working_directory_path($packager, $this);
     $zip_file = dirname($wd) . '/' . $this->project_node->short_name . '-' . $this->version_string() . '.zip';
-    if ($zip->open($zip_file, ZipArchive::OVERWRITE)) {
+    if ($zip->open($zip_file, ZipArchive::OVERWRITE)===TRUE) {
       // Add the project directory to the zip archive
       $zip->addEmptyDir($this->project_node->short_name);
       // Recursively add files to the zip archive, excluding all files matching the exclude patterns
