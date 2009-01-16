@@ -13,10 +13,15 @@
 function dproject_views_data() {
   $data = array();
 
-//TODO: Status, Packager, File, Metadata, readable version
-//TODO: Release bases
+//TODO: Status, Packager, Metadata, readable version
 
   $data['dproject_release']['table']['group']  = t('dProject Release');
+
+  $data['dproject_release']['table']['base'] = array(
+    'field' => 'rid',
+    'title' => t('Release'),
+    'help' => t('Release items are created from project nodes.'),
+  );
 
   $data['dproject_release']['table']['join'] = array(
     'node' => array(
@@ -160,6 +165,42 @@ function dproject_views_data() {
     ),
   );
 
+  $data['dproject_release']['file_path'] = array(
+    'title' => t('File Path'),
+    'help' => t('Path to where the file can be found'),
+    'field' => array(
+      'handler' => 'views_handler_field',
+      'click sortable' => TRUE,
+    ),
+    'argument' => array(
+      'handler' => 'views_handler_argument_string',
+    ),
+    'filter' => array(
+      'handler' => 'views_handler_filter_string',
+    ),
+    'sort' => array(
+      'handler' => 'views_handler_sort',
+    ),
+  );
+
+  $data['dproject_release']['file_path'] = array(
+    'title' => t('Release Path'),
+    'help' => t('Path to where the release can be found'),
+    'field' => array(
+      'handler' => 'views_handler_field',
+      'click sortable' => TRUE,
+    ),
+    'argument' => array(
+      'handler' => 'views_handler_argument_string',
+    ),
+    'filter' => array(
+      'handler' => 'views_handler_filter_string',
+    ),
+    'sort' => array(
+      'handler' => 'views_handler_sort',
+    ),
+  );
+
   $data['dproject_release']['md5'] = array(
     'title' => t('MD5'),
     'help' => t('The md5 hash of the release file'),
@@ -178,5 +219,32 @@ function dproject_views_data() {
     ),
   );
 
+  /* Non-table fields */
+
+  $data['dproject_release']['view_release'] = array(
+    'title' => t('Release Link'),
+    'help' => t('Link to where the release can be found'),
+    'field' => array(
+      'handler' => 'dproject_views_handler_field_release_link',
+    ),
+  );
+
   return $data;
+}
+
+/**
+ * Implementation of hook_views_handlers() to register all of the basic handlers
+ * views uses.
+ */
+function dproject_views_handlers() {
+  return array(
+    'info' => array(
+      'path' => drupal_get_path('module', 'dproject') . '/views',
+    ),
+    'handlers' => array(
+      'dproject_views_handler_field_release_link' => array(
+        'parent' => 'views_handler_field',
+      ),
+    ),
+  );
 }
