@@ -92,6 +92,15 @@ function dproject_menu() {
     'type' => MENUITEM_CALLBACK,
   );
 
+  $items['project/%dprojectnode/releases/%'] = array(
+    'title' => t('Release information'),
+    'page callback' => '_dproject_release_information',
+    'page arguments' => array(1, 3),
+    'access callback' => '_dproject_node_access',
+    'access arguments' => array(1, 'view'),
+    'type' => MENUITEM_CALLBACK,
+  );
+
   $items['project/%dprojectnode/packagers/%/release/confirm/%'] = array(
     'title' => t('Confirm project release'),
     'page callback' => 'drupal_get_form',
@@ -260,7 +269,7 @@ function _dproject_project_packagers_submit($form, $form_state) {
   );
   drupal_write_record('dproject_packager', $values);
 
-  // Call the packager created function for the packager type
+  // Call the packager's created function for the packager type
   if (isset($packagers[$packager_type]) && isset($packagers[$packager_type]['packager created'])) {
     $pid = db_last_insert_id('dproject_packager', 'pid');
     $packager = dproject_get_project_packager($pid);
@@ -280,7 +289,15 @@ function _dproject_create_project_release($form_state, $project, $pid) {
     l('Packagers', 'project/' . $project->short_name . '/packagers'),
   ));
 
-  $form = array();
+  // Allow packagers to provide completely customized forms
+  if (isset($packager_type['custom_creation_form']) && is_callable($packager_type['custom_creation_form'])) {
+    return call_user_func($packager_type['custom_creation_form'], 
+      $form_state, $project, $packager, $packager_type, $last_release);
+  }
+
+  $form = array(
+    '#id' => 'dproject_create_project_release',
+  );
 
   $form['pid'] = array(
     '#type' => 'value',
@@ -365,6 +382,11 @@ function _dproject_create_project_release($form_state, $project, $pid) {
     '#type' => 'submit',
     '#value' => t('Create'),
   );
+
+  // Allow the packager to alter the form
+  if (isset($packager_type['create_release_form_alter']) && is_callable($packager_type['create_release_form_alter'])) {
+    call_user_func_array($packager_type['create_release_form_alter'], array(&$form, $form_state, $form['#id'], $project, $packager, $packager_type, $last_release));
+  }
 
   return $form;
 }
@@ -640,7 +662,7 @@ function _dproject_confirm_project_release($form_state, $project, $pid, $rid) {
 function _dproject_project_release_create($form, $form_state) {
   $release = DProjectRelease::load($form_state['values']['release']);
 
-  //$release->package();
+  $release->package();
   $release->set_published(TRUE);
   $release->set_temporary(FALSE);
   $release->save();
@@ -950,5 +972,21 @@ function dproject_nodeapi($node, $op, $form) {
 
       break;
     }
+  }
+}
+
+function _dproject_append_packager_info(&$release, $path_info, &$content) {
+  if ($path_info['extension']=='info') {
+    $version = $release->get_version();
+    $node = $release->get_project_node();
+    
+    $packaging_info = array();
+    $packaging_info[] = '; Information added by ' . variable_get('site_name','unknown') . ' packaging script on ' . date('c', $release->get_created());
+    $packaging_info[] = 'version = "' . $release->version_string() . '"';
+    $packaging_info[] = 'core = "' . $version[0] . '.x"';
+    $packaging_info[] = 'project = "' . $node->short_name . '"';
+    $packaging_info[] = 'datestamp = "' . $release->get_created() . '"';
+    $packaging_info[] = 'project status url = "' . url('release-history', array('absolute'=>TRUE)) . '"';
+    $content .= "\n\n" . join("\n", $packaging_info);
   }
 }

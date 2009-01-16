@@ -32,6 +32,10 @@ function _dproject_feed_generate($pid, $api_version) {
     $node = node_load($pid);
   }
 
+  if (is_string($api_version)) {
+    $api_version = intval($api_version);
+  }
+
   $dom = new DomDocument('1.0');
   $dom->formatOutput = TRUE;
 
@@ -81,7 +85,7 @@ function _dproject_feed_generate($pid, $api_version) {
       $release->appendChild($dom->createElement('version_extra', $version[3]));
     }
     // TODO: This release link doesn't point to anything. Implement it in the menu system.
-    $release->appendChild($dom->createElement('release_link', url('node/' . $node->nid . '/release/' . $rel->version_string(), array('absolute'=>TRUE))));
+    $release->appendChild($dom->createElement('release_link', url('project/' . $node->short_name . '/releases/' . $rel->version_string(), array('absolute'=>TRUE))));
     $release->appendChild($dom->createElement('download_link', url($rel->get_file_path(), array('absolute'=>TRUE))));
     $release->appendChild($dom->createElement('date', $rel->get_created()));
     $release->appendChild($dom->createElementNS(DPROJECT_NAMESPACE, 'iso_date', date('c', $rel->get_created())));
@@ -115,7 +119,7 @@ function _dproject_feed_generate($pid, $api_version) {
     }
   }
 
-  print '<pre>' . htmlspecialchars($dom->saveXML()) . '</pre>';
+  print $dom->saveXML();
   die;
 }
 

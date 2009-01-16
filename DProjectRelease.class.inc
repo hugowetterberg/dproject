@@ -34,6 +34,7 @@ class DProjectRelease {
   public function DProjectRelease($project_node) {
     $this->metadata = new stdClass();
     $this->project_node = $project_node;
+    $this->add_file_alter('_dproject_append_packager_info');
   }
 
   /**
