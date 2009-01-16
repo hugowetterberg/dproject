@@ -13,7 +13,8 @@
 function dproject_views_data() {
   $data = array();
 
-//TODO: Status, Packager, Metadata, readable version
+//TODO: Status, Packager, Metadata
+//TODO: Try to create link as: project/%dprojectnode/releases/%
 
   $data['dproject_release']['table']['group']  = t('dProject Release');
 
@@ -38,6 +39,17 @@ function dproject_views_data() {
     ),
     'sort' => array(
       'handler' => 'views_handler_sort',
+    ),
+  );
+
+  $data['dproject_release']['project_nid'] = array(
+    'title' => t('Node'),
+    'help' => t('The node the release is made from.'),
+    'relationship' => array(
+      'base' => 'node',
+      'field' => 'nid',
+      'handler' => 'views_handler_relationship',
+      'label' => t('Node'),
     ),
   );
 
@@ -131,6 +143,24 @@ function dproject_views_data() {
     ),
   );
 
+  $data['dproject_release']['status'] = array(
+    'title' => t('Status'),
+    'help' => t('The status of the release'),
+    'field' => array(
+      'handler' => 'dproject_views_handler_field_release_status',
+      'click sortable' => TRUE,
+    ),
+    'argument' => array(
+      'handler' => 'dproject_views_handler_argument_release_status',
+    ),
+    'filter' => array(
+      'handler' => 'dproject_views_handler_filter_release_status',
+    ),
+    'sort' => array(
+      'handler' => 'views_handler_sort',
+    ),
+  );
+
   $data['dproject_release']['published'] = array(
     'title' => t('Published'),
     'help' => t('The published state of the release'),
@@ -159,24 +189,6 @@ function dproject_views_data() {
       'handler' => 'views_handler_filter_boolean_operator',
       'label' => t('Temporary'),
       'type' => 'yes-no',
-    ),
-    'sort' => array(
-      'handler' => 'views_handler_sort',
-    ),
-  );
-
-  $data['dproject_release']['file_path'] = array(
-    'title' => t('File Path'),
-    'help' => t('Path to where the file can be found'),
-    'field' => array(
-      'handler' => 'views_handler_field',
-      'click sortable' => TRUE,
-    ),
-    'argument' => array(
-      'handler' => 'views_handler_argument_string',
-    ),
-    'filter' => array(
-      'handler' => 'views_handler_filter_string',
     ),
     'sort' => array(
       'handler' => 'views_handler_sort',
@@ -221,6 +233,14 @@ function dproject_views_data() {
 
   /* Non-table fields */
 
+  $data['dproject_release']['readable_version'] = array(
+    'title' => t('Readable Version'),
+    'help' => t('A readable version such as 6.x-0.x-dev'),
+    'field' => array(
+      'handler' => 'dproject_views_handler_field_release_version',
+    ),
+  );
+
   $data['dproject_release']['view_release'] = array(
     'title' => t('Release Link'),
     'help' => t('Link to where the release can be found'),
@@ -244,6 +264,18 @@ function dproject_views_handlers() {
     'handlers' => array(
       'dproject_views_handler_field_release_link' => array(
         'parent' => 'views_handler_field',
+      ),
+      'dproject_views_handler_field_release_version' => array(
+        'parent' => 'views_handler_field',
+      ),
+      'dproject_views_handler_field_release_status' => array(
+        'parent' => 'views_handler_field',
+      ),
+      'dproject_views_handler_filter_release_status' => array(
+        'parent' => 'views_handler_filter_in_operator',
+      ),
+      'dproject_views_handler_argument_release_status' => array(
+        'parent' => 'views_handler_argument',
       ),
     ),
   );
