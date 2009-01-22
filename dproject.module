@@ -187,7 +187,7 @@ function _dproject_project_packagers($form_state, $node) {
   $pp = dproject_get_project_packagers($node->nid);
   $po = '<ul>';
   foreach ($pp as $p) {
-    $po .= '<li><label>' . $p->packager . '</label>';
+    $po .= '<li><h3>' . $packagers[$p->packager]['title'] . '</h3>';
     $po .= '<div class="packager-description">';
     $po .= dproject_packager_description($p);
     $po .= '</div>';
