@@ -1,0 +1,15 @@
+<?php
+require_once(drupal_get_path('module', 'datapoint') . '/datapoint.vertex-install.inc');
+
+function datapoint_project_schema() {
+  $schema = datapoint_vertex_module_schema('datapoint_project');
+  return $schema;
+}
+
+function datapoint_project_install() {
+  drupal_install_schema('datapoint_project');
+}
+
+function datapoint_project_uninstall() {
+  drupal_uninstall_schema('datapoint_project');
+}

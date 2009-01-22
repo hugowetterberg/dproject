@@ -1,0 +1,6 @@
+name = "Project release updates"
+version = "6.x-0.1"
+core = "6.x"
+description = "Module that consumes project release update feeds"
+dependencies[] = datapoint
+package = Datapoint

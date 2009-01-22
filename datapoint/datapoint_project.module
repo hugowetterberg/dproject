@@ -1,0 +1,36 @@
+<?php
+
+function datapoint_project_datapoint_parser() {
+  return array(
+    'name' => 'Project release feed',
+    'source configuration' => '_datapoint_project_source_configuration',
+    'source configuration submit' => '_datapoint_project_source_configuration_submit',
+    'fetch' => '_datapoint_project_fetch',
+  );
+}
+
+function _datapoint_project_source_configuration($configuration) {
+  $settings = array();
+  $settings['url'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Url to release history feed'),
+    '#default_value' => $configuration['url'],
+  );
+  return $settings;
+}
+
+function _datapoint_project_source_configuration_submit($values) {
+  return array(
+    'url' => $values['url'],
+  );
+}
+
+function _datapoint_dproject_fetch($source, &$result) {
+  $url = $source['source configuration']['url'];
+  datapoint_url_fetch($url, $source, $result, '_datapoint_project_datapoint_parseresult');
+}
+
+function _datapoint_project_datapoint_parseresult($data, $source, &$res) {
+  print $data;
+  die;
+}
