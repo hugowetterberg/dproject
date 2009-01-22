@@ -5,6 +5,10 @@
  * @version $Id$
  **/
 
+function dpgit_uninstall() {
+  variable_del('git_path');
+}
+
 function dpgit_requirements($phase) {
   $requirements = array();
   $t = get_t();
