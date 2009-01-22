@@ -1,0 +1,37 @@
+<?php
+// $Id$
+
+function dpremote_install() {
+  drupal_install_schema('dpremote');
+}
+
+function dpremote_uninstall() {
+  drupal_uninstall_schema('dpremote');
+}
+
+function dpremote_schema() {
+  $schema = array();
+
+  $schema['dpremote_servers'] = array(
+    'description' => t('Known remote servers'),
+    'fields' => array(
+      'url' => array(
+        'description' => t('The base url'),
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'name' => array(
+        'description' => t('The server name'),
+        'type' => 'varchar',
+        'length' => 64,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+    ),
+    'primary key' => array('url'),
+  );
+  
+  return $schema;
+}
