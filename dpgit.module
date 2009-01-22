@@ -10,7 +10,7 @@ define('DPGIT_DPROJECT_NAMESPACE', 'http://goodold.se/project/dproject/dpgit');
 function dpgit_dproject_packager() {
   return array(
     'git' => array(
-      'title' => t('Git'),
+      'title' => t('Git repository'),
       'namespace' => DPGIT_DPROJECT_NAMESPACE,
       'configuration form' => '_dpgit_configure_source',
       'configuration submit' => '_dpgit_configure_source_submit',
