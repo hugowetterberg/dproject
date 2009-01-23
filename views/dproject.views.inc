@@ -290,10 +290,18 @@ function dproject_views_data() {
   );
 
   $data['dproject_release']['view_release'] = array(
-    'title' => t('Release Link'),
-    'help' => t('Link to where the release can be found'),
+    'title' => t('Release File Link'),
+    'help' => t('Link to where the release file can be found'),
     'field' => array(
       'handler' => 'dproject_views_handler_field_release_link',
+    ),
+  );
+
+  $data['dproject_release']['link_release_page'] = array(
+    'title' => t('Page Link'),
+    'help' => t('Link to where the release page can be found'),
+    'field' => array(
+      'handler' => 'dproject_views_handler_field_release_page_link',
     ),
   );
 
@@ -324,6 +332,9 @@ function dproject_views_handlers() {
       ),
       'dproject_views_handler_argument_release_status' => array(
         'parent' => 'views_handler_argument',
+      ),
+      'dproject_views_handler_field_release_page_link' => array(
+        'parent' => 'dproject_views_handler_field_release_version',
       ),
     ),
   );

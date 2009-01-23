@@ -16,7 +16,7 @@ class dproject_views_handler_field_release_version extends views_handler_field {
     $this->add_additional_fields();
   }
 
-  function render($values) {
+  function get_readable_release_version($values) {
     $api = $values->{$this->aliases['api_version']};
     $major = $values->{$this->aliases['major_version']};
     $minor = $values->{$this->aliases['minor_version']};
@@ -29,5 +29,9 @@ class dproject_views_handler_field_release_version extends views_handler_field {
     $extra = empty($extra) ? '' : '-' . $extra;
 
     return $api . '.x-' . $major . '.' . $minor . $extra;
+  }
+
+  function render($values) {
+    return $this->get_readable_release_version($values);
   }
 }
