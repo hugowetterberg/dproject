@@ -6,24 +6,23 @@
  * @package default
  */
 class DProject {
-  public const API_VERSION = 1;
-  public const NAMESPACE = 'http://goodold.se/project/dproject';
+  const API_VERSION = 1;
+  const NAMESPACE = 'http://goodold.se/project/dproject';
 
   // Error codes
-  public const TMPDIR_ERROR = 100);
-  public const RELEASE_FILE_READ_ERROR = 101;
-  public const RELEASE_FILE_WRITE_ERROR = 102;
-  public const CHECKSUM_ERROR = 200;
-  public const DB_INTEGRITY_ERROR = 300;
-  public const VALIDATION_ERROR = 400;
+  const TMPDIR_ERROR = 100;
+  const RELEASE_FILE_READ_ERROR = 101;
+  const RELEASE_FILE_WRITE_ERROR = 102;
+  const CHECKSUM_ERROR = 200;
+  const DB_INTEGRITY_ERROR = 300;
+  const VALIDATION_ERROR = 400;
 
   // Release status codes
-  public const RELEASE_STATUS_UNSUPPORTED = 0;
-  public const RELEASE_STATUS_SUPPORTED = 1;
-  public const RELEASE_STATUS_RECOMMENDED = 2; // Recommended releases are always supported
+  const RELEASE_STATUS_UNSUPPORTED = 0;
+  const RELEASE_STATUS_SUPPORTED = 1;
+  const RELEASE_STATUS_RECOMMENDED = 2; // Recommended releases are always supported
 
   private static $instance = NULL;
-  private static $loadedPackagers = array();
 
   protected $modules = array();
   protected $classes = array();
@@ -56,7 +55,7 @@ class DProject {
     foreach ($modules as $module) {
       $impl = call_user_func($module . '_dproject_api');
       if (isset($impl[DProject::API_VERSION])) {
-        $this->registerApiImplementation($module, $impl);
+        $this->registerApiImplementation($module, $impl[DProject::API_VERSION]);
       }
     }
   }
@@ -75,6 +74,8 @@ class DProject {
     // Store module path
     $this->modules[$module]['path'] = $impl['path'];
 
+    
+
     // Register the packagers
     foreach ($impl['packagers'] as $name => $info) {
       $this->packagers[$name] = $info;
@@ -90,10 +91,10 @@ class DProject {
   /**
    * Helper function for loading classes for DProject
    *
-   * @param class
+   * @param string $class
    *  The name of the class that should be loaded
    */
-  public function require($class) {
+  public function requireClass($class) {
     // Check so that the class is not already loaded.
     // This will trigger the autoloader if it's set.
     if (class_exists($class)) {
@@ -112,7 +113,7 @@ class DProject {
 
       // Recursive calls to require dependencies.
       foreach ($c->dependencies as $d) {
-        if (!$this->require($d)) {
+        if (!$this->requireClass($d)) {
           // Always fail if a dependency cannot be loaded.
           $c->failed = TRUE;
           return FALSE;
@@ -152,16 +153,14 @@ class DProject {
    *  Returns a instance of the requested class, if it could be
    *  loaded. Otherwise nothing is returned
    **/
-  public function instanceOf($class, $arguments=array()) {
-    if ($this->require($class)) {
-      // Call the class directly if we don't need to pass arguments
-      // TODO: This is only compatible with PHP 5.3, rewrite to always use reflection instead
-      if (!count($arguments)) {
-        return new $class();
-      }
-      else { // Use reflection if we need to pass argumentss
-        $reflected = new ReflectionClass($class);
-        return $reflected->newInstanceArgs($arguments);
+  public function newInstanceOf($class, $arguments=array()) {
+    if ($this->requireClass($class)) {
+      $ref = new ReflectionClass($class);
+      if ($ref->isInstantiable()) {
+        $i = $ref->newInstanceArgs($arguments);
+        if ($ref->isInstance($i)) {
+          return $i;
+        }
       }
     }
   }

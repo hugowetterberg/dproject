@@ -1,8 +1,17 @@
 <?php
 
-class DPGitPackager extends DProjectPackager {
-  public const NAMESPACE = 'http://goodold.se/project/dproject/dpgit';
-  
+class DPGitPackager extends DProjectPackager implements dProjectUpdateablePackager {
+  const NAMESPACE = 'http://goodold.se/project/dproject/dpgit';
+
+  /**
+   * Gets the the type name of the packager
+   *
+   * @return void
+   */
+  public function getTypeName() {
+    return 'git';
+  }
+
   /**
    * Callback for getting the name of the git packager
    *
@@ -12,7 +21,7 @@ class DPGitPackager extends DProjectPackager {
   public function getName() {
     return t('Git repository');
   }
-  
+
   /**
    * Callback for getting a description for the git packager
    *
@@ -47,9 +56,9 @@ class DPGitPackager extends DProjectPackager {
       return $out;
     }
   }
-  
-  public function getSources() {
-    return array(
+
+  public function getSources($name=NULL) {
+    $sources = array(
       'branches' => array(
         'title' => 'Branches',
         'options' => array($this, 'branchesOptions'),
@@ -66,8 +75,17 @@ class DPGitPackager extends DProjectPackager {
         'resolve' => array($this, 'referenceSha1'),
       ),
     );
+    
+    if ($name) {
+      if (isset($sources[$name])) {
+        return $sources[$name];
+      }
+    }
+    else {
+      return $sources;
+    }
   }
-  
+
   /**
    * Callback for generating a form fragment for configuring
    * a new git packager.
@@ -98,7 +116,7 @@ class DPGitPackager extends DProjectPackager {
       'url' => $values['git_source'],
     );
   }
-  
+
   /**
    * Configures a release object using the supplied information
    *
@@ -126,7 +144,7 @@ class DPGitPackager extends DProjectPackager {
       $metadata->info = $info;
     }
   }
-  
+
   /**
    * Creates a local clone of the git repository
    * @return void
@@ -171,7 +189,7 @@ class DPGitPackager extends DProjectPackager {
       ), WATCHDOG_ERROR);
     }
   }
-  
+
   /**
    * Callback that creates a temporary directory with the
    * files to package.
@@ -198,7 +216,7 @@ class DPGitPackager extends DProjectPackager {
       return $target;
     }
   }
-  
+
   /**
    * Checks out a specific commit of a git repo into a directory
    *
@@ -222,7 +240,7 @@ class DPGitPackager extends DProjectPackager {
     exec(DPGitPackager::gitShellCommand('checkout ' . $sha1 . ' -- ./', $git_dir, $target_dir), $out, $ret);
     return $ret==0;
   }
-  
+
   /**
    * Gets the sha1 hash for a reference
    *
@@ -277,7 +295,7 @@ class DPGitPackager extends DProjectPackager {
 
     return $tags;
   }
-  
+
   /**
    * Returns information about a reference
    *
@@ -299,7 +317,7 @@ class DPGitPackager extends DProjectPackager {
     }
     return FALSE;
   }
-  
+
   /**
    * Gets the commit log as a associative arrayed keyed to the sha1 of the commit
    *
@@ -403,11 +421,11 @@ class DPGitPackager extends DProjectPackager {
 
     return $log;
   }
-  
+
   /**
    * Fetches updates from the origin repositiory
    *
-   * @param string $status_out 
+   * @param string $status_out
    * @return void
    */
   public function update(&$status_out=NULL) {
@@ -436,13 +454,13 @@ class DPGitPackager extends DProjectPackager {
       return ($return === 0);
     }
     else {
-      $this->setMessage('dpgit', 'fetch', 'Git: The working directort !dir doesn\'t exist', array(
+      $this->setMessage('dpgit', 'fetch', 'Git: The working directory !dir doesn\'t exist', array(
         '!dir' => $wdir,
       ), WATCHDOG_ERROR);
       return FALSE;
     }
   }
-  
+
   /**
    * Helper function that creates shell commands for working with git
    *
@@ -467,7 +485,7 @@ class DPGitPackager extends DProjectPackager {
     $git_path = variable_get('git_path', 'git');
     return $git_path . ' ' . $command;
   }
-  
+
   /**
    * Expands the $Id$ keywords in a file
    *
@@ -502,7 +520,7 @@ class DPGitPackager extends DProjectPackager {
       }
     }
   }
-  
+
   /**
    * Callback that is used to get tags for
    * the packager source list.

@@ -1,12 +1,25 @@
 <?php
 
-public class DProjectPackager {
+interface dProjectUpdateablePackager {
+  /**
+   * Fetches updates from the packager source
+   *
+   * @param string $status_out
+   * @return void
+   */
+  public function update(&$status_out=NULL);
+}
+
+class DProjectPackager {
+  private static $loadedPackagers = array();
+
   private $packagerTypeName = '';
   private $projectNode = NULL;
+
   protected $nid = 0;
   protected $pid = 0;
   protected $configuration;
-  
+
   /**
    * Constructor for the packager
    *
@@ -23,7 +36,21 @@ public class DProjectPackager {
       $this->configuration = $obj->configuration;
     }
     else {
-      $this->configuration = new stdClass()
+      $this->configuration = new stdClass();
+    }
+  }
+  
+  /**
+   * Gets the the type name of the packager
+   *
+   * @return void
+   */
+  public function getTypeName() {
+    if (!empty($this->packagerTypeName)) {
+      $this->packagerTypeName;
+    }
+    else {
+      return 'none';
     }
   }
 
@@ -36,7 +63,7 @@ public class DProjectPackager {
   public function getName() {
     return t('Unimplemented packager');
   }
-  
+
   /**
    * Callback for getting a description for the packager
    *
@@ -48,7 +75,7 @@ public class DProjectPackager {
       '!packager' => $this->packagerTypeName,
     ));
   }
-  
+
   /**
    * Gets the description of a release's source
    *
@@ -62,7 +89,7 @@ public class DProjectPackager {
       '!packager' => $this->packagerTypeName,
     ));
   }
-  
+
   /**
    * Callback for generating a form fragment for configuring
    * a new packager.
@@ -73,7 +100,7 @@ public class DProjectPackager {
   public function configurationForm() {
     return array();
   }
-  
+
   /**
    * Callback for turning the submitted values for the configuration form
    * into a configuration array
@@ -85,25 +112,16 @@ public class DProjectPackager {
   public function configurationFormSubmit($values) {
     return array();
   }
-  
+
   /**
    * Callback for validated the submitted values for the configuration form
    *
-   * @param string $values 
+   * @param string $values
    * @return void
    */
   public function configurationFormValidate($values) {
   }
-  
-  /**
-   * Fetches updates from the packager source
-   *
-   * @param string $status_out 
-   * @return void
-   */
-  public function update(&$status_out=NULL) {
-  }
-  
+
   /**
    * Callback that creates a temporary directory with the
    * files to package for the release.
@@ -115,7 +133,7 @@ public class DProjectPackager {
    */
   public function package($release) {
   }
-  
+
   /**
    * Configures a release object using the supplied information
    *
@@ -127,26 +145,29 @@ public class DProjectPackager {
    */
   public function configureRelease(&$release, $reference) {
   }
-  
+
   /**
    * Performs initialization work when the packager has been created
    *
-   * @param string $status_out 
+   * @param string $status_out
    *  Used to pass back status messages
    * @return void
    */
-  public function created(&$status_out=Null) {
+  public function created(&$status_out=NULL) {
   }
-  
+
   /**
    * Gets the sources that are available to create releases
    * from.
    *
+   * @param string $name
+   *  Optional. The name of the source.
+   *
    * @return array
-   *  An array of sources
+   *  An array of sources or a specific source if a name was supplied.
    */
-  public function getSources() {
-    return array()
+  public function getSources($name=NULL) {
+    return array();
   }
 
   /**
@@ -165,7 +186,7 @@ public class DProjectPackager {
     ));
     $this->deleted();
   }
-  
+
   /**
    * Cleanup action when deleting a packager
    * Deletes the local working directory
@@ -200,18 +221,18 @@ public class DProjectPackager {
     }
     return $this->projectNode;
   }
-  
+
   /**
    * Helper function for getting values from the configuration object.
    *
-   * @param string $name 
+   * @param string $name
    *  The name of the configuration attribute
    * @param mixed $default
    *  Optional. The default value that should be used if the value doesn't exist.
    * @return void
    */
   protected function conf($name, $default=NULL) {
-    if (is_class($this->configuration) && isset($this->configuration->$name)) {
+    if (is_object($this->configuration) && isset($this->configuration->$name)) {
       return $this->configuration->$name;
     }
     return $default;
@@ -245,8 +266,8 @@ public class DProjectPackager {
     }
     else {
       // Permanent working directories are stored in the project file directory
-      $dp = DProject::instance();
-      return $dp->projectFileDirectory($this->getId()) . '/' . $this->getId();
+      $dp = DProject::singleton();
+      return $dp->projectFileDirectory($this->getNid()) . '/' . $this->getId();
     }
   }
 
@@ -349,7 +370,7 @@ public class DProjectPackager {
       unlink($dir);
     }
   }
-  
+
   /**
    * Helper function that returns a
    * packager instance from a result row
@@ -370,9 +391,10 @@ public class DProjectPackager {
    *  result doesn't contain enough information for creating
    *  a packager instance.
    */
-  private function packagerFromResult($res) {
+  private static function packagerFromResult($res) {
     static $mandatory = array('nid','pid','configuration','packager');
     $row = is_array($res) ? $res : db_fetch_array($res);
+    $dp = DProject::singleton();
 
     if ($row) {
       // Check that the mandatory values are here
@@ -385,28 +407,27 @@ public class DProjectPackager {
       }
 
       // Return a cached packager if possible
-      if (isset(DProject::$loadedPackagers[$row['pid']])) {
-        return clone DProject::$loadedPackagers[$row['pid']];
+      if (isset(DProjectPackager::$loadedPackagers[$row['pid']])) {
+        return clone DProjectPackager::$loadedPackagers[$row['pid']];
       }
 
       // Decode configuration json and get the packager declaration info
       $row['configuration'] = json_decode($row['configuration']);
-      $ptype = $this->getPackagerTypes($row['packager']);
-
+      $ptype = $dp->getPackagerTypes($row['packager']);
       try {
         if ($ptype) {
           // The packager type was known, create a instance of the declared packager class
-          $packager = $this->instanceOf($ptype['class'], (object)$row);
+          $packager = $dp->newInstanceOf($ptype['class'], array((object)$row));
         }
 
         if (!$packager) {
           // The packager was unknown or it's class declaration could not be resolved
           // creating a packager from the base packager class
-          $packager = $this->instanceOf('DProjectPackager', (object)$row);
+          $packager = $dp->newInstanceOf('DProjectPackager', array((object)$row));
         }
 
         // Cache the packager
-        DProject::$loadedPackagers[$row['pid']] = $packager;
+        DProjectPackager::$loadedPackagers[$row['pid']] = $packager;
 
         return clone $packager;
       }
@@ -437,7 +458,7 @@ public class DProjectPackager {
   }
 
   /**
-   * Gets a project packager from a packager id
+   * Gets a packager from a packager id
    *
    * @param int $pid
    *  The id of the packager
@@ -447,16 +468,25 @@ public class DProjectPackager {
    * @throws Exception
    *  A exception is thrown if packager instantiation failed
    */
-  public function getProjectPackager($pid) {
+  public static function getPackager($pid) {
     // Return a cached packager if possible
-    if (isset(DProject::$loadedPackagers[$row['pid']])) {
-      return clone DProject::$loadedPackagers[$row['pid']];
+    if (isset(DProjectPackager::$loadedPackagers[$row['pid']])) {
+      return clone DProjectPackager::$loadedPackagers[$row['pid']];
     }
 
     $res = db_query("SELECT pid, nid, packager, configuration FROM {dproject_packager} WHERE pid=%d", array(
       ':pid' => $pid,
     ));
-    return $this->packagerFromResult($res);
+    return DProjectPackager::packagerFromResult($res);
+  }
+  
+  public static function newInstanceOf($packager_type) {
+    $dp = DProject::singleton();
+    $info = $dp->getPackagerTypes($packager_type);
+    if ($info) {
+      $i = $dp->newInstanceOf($info['class']);
+      return $i;
+    }
   }
 
   /**
@@ -470,41 +500,18 @@ public class DProjectPackager {
    * @throws Exception
    *  A exception is thrown if packager instantiation failed
    */
-  public function getProjectPackagers($project) {
+  public static function getProjectPackagers($project) {
     if (is_object($project)) {
       $project = $project->nid;
     }
 
-    $packagers = array();
     $res = db_query("SELECT nid, pid, packager, configuration FROM {dproject_packager} WHERE nid=%d", array(
       ':nid' => $project,
     ));
-    while ($packager = $this->packagerFromResult($res)) {
+    $packagers = array();
+    while ($packager = DProjectPackager::packagerFromResult($res)) {
       $packagers[] = $packager;
     }
     return $packagers;
-  }
-
-  /**
-   * Deletes a project packager and performs all the necessary cleanup
-   *
-   * @param int/stdClass $packager
-   *  The id of the packager that should be deleted, or a packager object
-   * @return void
-   */
-  public function deleteProjectPackager($packager) {
-    if (is_numeric($packager)) {
-      $packager = $this->getProjectPackager($packager);
-    }
-
-    if ($packager) {
-      db_query("DELETE FROM {dproject_packager} WHERE pid = %d", array(
-        ':pid' => $packager->pid,
-      ));
-      db_query("DELETE FROM {dproject_packager_message} WHERE pid = %d", array(
-        ':pid' => $packager->pid,
-      ));
-      $packager->deleted();
-    }
   }
 }

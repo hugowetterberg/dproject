@@ -1,7 +1,16 @@
 <?php
 
-class DPGitPackager extends DProjectPackager {
-  public const NAMESPACE = 'http://goodold.se/project/dproject/dpremote';
+class DPRemotePackager extends DProjectPackager {
+  const NAMESPACE = 'http://goodold.se/project/dproject/dpremote';
+  
+  /**
+   * Gets the the type name of the packager
+   *
+   * @return void
+   */
+  public function getTypeName() {
+    return 'remote';
+  }
   
   public function getName() {
     return t('Remote project server');
@@ -24,7 +33,7 @@ class DPGitPackager extends DProjectPackager {
    *  A description
    */
   public function getDescription() {
-    $known = dpremote_known_project_servers();
+    $known = DPRemotePackager::knownProjectServers();
     $out = '';
     if (isset($known[$this->configuration->project_site])) {
       $out .= '<strong>' . t('Server') . ':</strong> ' . $known[$this->configuration->project_site] . '<br/>';
@@ -34,7 +43,9 @@ class DPGitPackager extends DProjectPackager {
     return $out;
   }
   
-  public abstract function getSourceDescription();
+  // public function getSourceDescription() {
+  //   
+  // }
   
   public function configurationForm() {
     // TODO: Only one hard-coded source here now, known/discovered sources 
@@ -42,7 +53,7 @@ class DPGitPackager extends DProjectPackager {
     $source_opts = array(
       '' => t('-- Select a server'),
     );
-    foreach (dpremote_known_project_servers() as $uri => $name) {
+    foreach (DPRemotePackager::knownProjectServers() as $uri => $name) {
       $source_opts[$uri] = $name;
     }
 
@@ -109,7 +120,7 @@ class DPGitPackager extends DProjectPackager {
       }
     }
     else if ($using_known && ($using_custom || $partial_custom)) {
-      $known = dpremote_known_project_servers();
+      $known = DPRemotePackager::knownProjectServers();
       form_set_error('project_site', t('You must choose either to use a known project server or enter information for a new one, don\'t do both.'));
       form_set_error($using_custom || empty($values['project_site_name'])?'project_site_name':'project_site_base_url', 
         t('Clear name and base url fields if you want to use the known server !name. Deselect the known server!further if you want to use a new server.', array(
@@ -133,9 +144,9 @@ class DPGitPackager extends DProjectPackager {
     );
   }
   
-  public abstract function update();
-  public abstract function package();
-  public abstract function configureRelease();
+  // public abstract function update();
+  // public abstract function package();
+  // public abstract function configureRelease();
   
   public function created(&$status_out=Null) {
     $project = $this->getProject();
@@ -152,8 +163,8 @@ class DPGitPackager extends DProjectPackager {
     ));
   }
   
-  public abstract function deleted();
-  public abstract function getSources();
+  // public abstract function deleted();
+  // public abstract function getSources();
   
   public static function setKnownProjectServer($url, $name) {
     $exists = db_result(db_query("SELECT COUNT(*) FROM {dpremote_servers} WHERE url='%s'", array(
