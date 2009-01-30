@@ -5,168 +5,22 @@
  * @version $Id$
  **/
 
-define('DPREMOTE_DPROJECT_NAMESPACE', 'http://goodold.se/project/dproject/dpremote');
-
-function dpremote_dproject_packager() {
-  return array(
-    'remote' => array(
-      'title' => t('Remote project server'),
-      'namespace' => DPREMOTE_DPROJECT_NAMESPACE,
-      'configuration form' => '_dpremote_configure_source',
-      'configuration submit' => '_dpremote_configure_source_submit',
-      'configuration validate' => '_dpremote_configure_source_validate',
-      'packager description' => '_dpremote_description',
-    ),
-  );
-}
-
 /**
- * Callback for getting a description for a dpremote packager
+ * Implementation of hook_dproject_api
  *
- * @param stdClass $packager
- *  A packager object
- * @return string
- *  A description
+ * @return void
  */
-function _dpremote_description($packager) {
-  $project = node_load($packager->nid);
-  $known = dpremote_known_project_servers();
-  $out = '';
-  if (isset($known[$packager->configuration->project_site])) {
-    $out .= '<strong>' . t('Server') . ':</strong> ' . $known[$packager->configuration->project_site] . '<br/>';
-  }
-  $url = $packager->configuration->project_site . '/' . $project->short_name . '/' . $packager->configuration->core_compatability . '.x';
-  $out .= '<strong>' . t('Url') . ':</strong> ' . l($url, $url);
-  return $out;
-}
-
-function _dpremote_configure_source() {
-  // TODO: Only one hard-coded source here now, known/discovered sources 
-  // should be added here too.
-  $source_opts = array(
-    '' => t('-- Select a server'),
-  );
-  foreach (dpremote_known_project_servers() as $uri => $name) {
-    $source_opts[$uri] = $name;
-  }
-  
-  $form = array();
-  
-  $api_matches = array();
-  $core_compat = array();
-  preg_match('/^\d+/', DRUPAL_CORE_COMPATIBILITY, $api_matches);
-  $core = $api_matches[0];
-  for ($i=4; $i<$core+3; $i++) {
-    $core_compat[$i] = $i . '.x';
-  }
-  
-  $form['core_compatability'] = array(
-    '#type' => 'select',
-    '#title' => t('Core compatability'),
-    '#options' => $core_compat,
-    '#default_value' => $core,
-  );
-  
-  $form['project_site'] = array(
-    '#type' => 'select',
-    '#title' => t('Known project servers'),
-    '#options' => $source_opts,
-    '#description' => l(t('Manage known servers'), 'admin/settings/dpremote/known_servers'),
-  );
-  
-  $form['manual_settings'] = array(
-    '#type' => 'fieldset',
-    '#title' => t('Use a new project server'),
-    '#description' => t('Enter the name and base url to the project server if it\'s not already available in the list of known project servers'),
-    // TODO: Find a way to support collapsible when using ahah!
-//    '#collapsible' => TRUE,
-//    '#collapsed' => TRUE,
-    'project_site_name' => array(
-      '#type' => 'textfield',
-      '#title' => t('Name'),
-    ),
-    'project_site_base_url' => array(
-      '#type' => 'textfield',
-      '#title' => t('Base Url'),
-      '#description' => t('The base url to project update feeds from this server. This is usually in the format !uri. When fetching update status the project short name and drupal core version is appended to this uri forming !uri!example', array(
-        '!uri' => UPDATE_DEFAULT_URL,
-        '!example' => '/project_name/' . DRUPAL_CORE_COMPATIBILITY,
-      )),
-    ),
-  );
-  
-  return $form;
-}
-
-function _dpremote_configure_source_validate($values) {
-  $using_known = !empty($values['project_site']);
-  $using_custom = !empty($values['project_site_name']) && !empty($values['project_site_base_url']);
-  $partial_custom = !$using_custom && (!empty($values['project_site_name']) || !empty($values['project_site_base_url']));
-  
-  if (!$using_known && !$using_custom) {
-    if ($partial_custom) {
-      form_set_error(empty($values['project_site_name'])?'project_site_name':'project_site_base_url', 
-        t('You must provide both name and base url when using a new project server'));
-    }
-    else {
-      form_set_error('project_site', t('You must choose a project server by selecting a known project server or entering information for a new one.'));
-    }
-  }
-  else if ($using_known && ($using_custom || $partial_custom)) {
-    $known = dpremote_known_project_servers();
-    form_set_error('project_site', t('You must choose either to use a known project server or enter information for a new one, don\'t do both.'));
-    form_set_error($using_custom || empty($values['project_site_name'])?'project_site_name':'project_site_base_url', 
-      t('Clear name and base url fields if you want to use the known server !name. Deselect the known server!further if you want to use a new server.', array(
-        '!name' => $known[$values['project_site']],
-        '!further' => $partial_custom?t(' and fill in both name and base url'):'',
-    )));
-  }
-}
-
-function _dpremote_configure_source_submit($values) {
-  if (!empty($values['project_site'])) {
-    $project_site = $values['project_site'];
-  }
-  else {
-    $project_site = $values['project_site_base_url'];
-  }
-  
+function dpremote_dproject_api() {
   return array(
-    'project_site' => $project_site,
-    'core_compatability' => $values['core_compatability'],
+    '1' => array(
+      'path' => drupal_get_path('module', 'dpremote') . '/includes',
+      'packagers' => array(
+        'remote' => array(
+          'name' => t('Remote project server'),
+          'class' => 'DPRemotePackager',
+          'dependecies' => 'DProjectPackager',
+        ),
+      ),
+    ),
   );
-}
-
-function dpremote_set_known_project_server($url, $name) {
-  $exists = db_result(db_query("SELECT COUNT(*) FROM {dpremote_servers} WHERE url='%s'", array(
-    ':url' => $url,
-  )));
-  $values = array(
-    'url' => $url,
-    'name' => $name,
-  );
-  $update = $exists?array('url'):NULL;
-  drupal_write_record('dpremote_servers', $values, $update);
-}
-
-function dpremote_delete_known_project_server($url) {
-  db_query("DELETE FROM {dpremote_servers} WHERE url='%s'", array(
-    ':url' => $url,
-  ));
-}
-
-function dpremote_known_project_servers($server=NULL, $remove=FALSE) {
-  static $known_servers;
-  
-  if (!$known_servers) {
-    $known_servers = array(
-      UPDATE_DEFAULT_URL => 'drupal.org',
-    );
-    $res = db_query("SELECT url, name FROM {dpremote_servers}");
-    while ($s = db_fetch_object($res)) {
-      $known_servers[$s->url] = $s->name;
-    }
-  }
-  
-  return $known_servers;
 }

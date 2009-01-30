@@ -3,3 +3,5 @@ name = "Remote server integration"
 core = "6.x"
 description = "Remote dproject or project server integration for the distributed project module"
 package = "Project"
+dependencies[] = dproject
+dependencies[] = datapoint_project

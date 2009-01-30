@@ -3,3 +3,4 @@ name = "Git integration"
 core = "6.x"
 description = "Git integration for the distributed project module"
 package = "Project"
+dependencies[] = dproject

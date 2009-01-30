@@ -5,7 +5,7 @@
  * @version $Id$
  **/
 
-require_once('dproject.api.inc');
+require_once('dproject.inc');
 require_once('dproject.token.inc');
 
 /**
@@ -168,6 +168,8 @@ function _dproject_packagers_redirect($node) {
 }
 
 function _dproject_project_packagers($form_state, $node) {
+  $dp = DProject::instance();
+  
   drupal_set_breadcrumb(array(
     l(t('Home'), '<front>'),
     l($node->title, 'node/' . $node->nid),
@@ -176,15 +178,15 @@ function _dproject_project_packagers($form_state, $node) {
     '!title' => $node->title,
   )));
   
-  $packagers = dproject_get_packager_types();
+  $packagers = $dp->getPackagerTypes();
   $pack_options = array(
     '' => t('--Select a packager')
   );
   foreach ($packagers as $name => $def) {
-    $pack_options[$name] = $def['title'];
+    $pack_options[$name] = $def['name'];
   }
 
-  $pp = dproject_get_project_packagers($node->nid);
+  $pp = $dp->getProjectPackagers($node->nid);
   $po = '<ul>';
   foreach ($pp as $p) {
     $po .= '<li><h3>' . $packagers[$p->packager]['title'] . '</h3>';
@@ -265,7 +267,9 @@ function _dproject_project_packagers_submit($form, $form_state) {
   $values = $form_state['values'];
   $packager_type = $values['packager'];
   $packagers = dproject_get_packager_types();
-  if (isset($packagers[$packager_type]) && isset($packagers[$packager_type]['configuration submit'])) {
+  $packager = $packagers[$packager_type];
+  
+  if (isset($packager['configuration submit'])) {
     $configuration = call_user_func($packagers[$packager_type]['configuration submit'], $values);
   }
   else {
@@ -277,6 +281,12 @@ function _dproject_project_packagers_submit($form, $form_state) {
     'packager' => $packager_type,
     'configuration' => json_encode($configuration),
   );
+  // Call the packager's before save function for the packager type
+  if (isset($packagers[$packager_type]) && isset($packagers[$packager_type]['packager created'])) {
+    $pid = db_last_insert_id('dproject_packager', 'pid');
+    $packager = dproject_get_project_packager($pid);
+    call_user_func($packagers[$packager_type]['packager created'], $packager);
+  }
   drupal_write_record('dproject_packager', $values);
 
   // Call the packager's created function for the packager type
@@ -407,21 +417,6 @@ function _dproject_create_project_release($form_state, $project, $pid) {
 }
 
 /**
- * Helper function used to check if
- * a value can be treated as a int
- *
- * @param mixed $v
- *  A value that should be checked
- * @return bool
- *  Returns TRUE if the value can be treated as a int
- */
-function _dproject_is_int($v) {
-  if (is_numeric($v) && intval($v)==$v) {
-    return TRUE;
-  }
-}
-
-/**
  * Validates the release creation form
  *
  * @param array $form
@@ -450,7 +445,7 @@ function _dproject_create_project_release_validate($form, $form_state) {
   }
 
   // Validate the minor version number
-  if (!_dproject_is_int($values['minor_version']) || $values['minor_version']<0) {
+  if (!DProject::isInt($values['minor_version']) || $values['minor_version']<0) {
     if ($values['version_extra'] != 'dev') {
       form_set_error('version_extra', 'You must create a "dev" release if you don\'t provide a numeric minor version number equal to or greater than zero');
     }
@@ -460,7 +455,7 @@ function _dproject_create_project_release_validate($form, $form_state) {
   }
 
   // Warn when creating a dev release with a specified minor version
-  if ($values['version_extra'] == 'dev' && _dproject_is_int($values['minor_version'])) {
+  if ($values['version_extra'] == 'dev' && DProject::isInt($values['minor_version'])) {
     drupal_set_message('Warning! You are creating a dev release so the minor version number for this release will be set as unspecified and replaced by an x', 'warning');
   }
 
@@ -495,22 +490,21 @@ function _dproject_create_project_release_validate($form, $form_state) {
  */
 function _dproject_create_project_release_submit($form, $form_state) {
   $values = $form_state['values'];
-  $packager = dproject_get_project_packager($values['pid']);
-  $packager_type = dproject_get_packager_types($packager->packager);
+  $packager = DProjectPackager::load($values['pid']);
   $project = node_load($packager->nid);
   $rel = new DProjectRelease($project);
-  $metadata = $rel->get_metadata_object();
+  $metadata = $rel->getMetadataObject();
 
   // Make changes in minor version number when necessary
-  if ($values['version_extra'] == 'dev' || !_dproject_is_int($values['minor_version']) || $values['minor_version']<0) {
+  if ($values['version_extra'] == 'dev' || !DProject::isInt($values['minor_version']) || $values['minor_version']<0) {
     $values['minor_version'] = NULL;
   }
 
   // Set version so that we can get the version string
-  $rel->set_version($values['api_version'], $values['major_version'], $values['minor_version'], $values['version_extra']);
+  $rel->setVersion($values['api_version'], $values['major_version'], $values['minor_version'], $values['version_extra']);
 
   // Set the packager for the release and store its configuration
-  $rel->set_packager($packager->pid);
+  $rel->setPackager($packager->pid);
   if (isset($packager_type['configure release'])) {
     call_user_func_array($packager_type['configure release'], array(
       &$rel, $packager, $values['source_identifier'],
@@ -533,7 +527,7 @@ function _dproject_create_project_release_submit($form, $form_state) {
   }
   
   // Interpret the release status value
-  $status = $rel->get_status();
+  $status = $rel->getStatus();
   switch ($values['release_status']) {
     case 'unsupported': 
       $status = DPROJECT_RELEASE_STATUS_UNSUPPORTED;
@@ -547,12 +541,12 @@ function _dproject_create_project_release_submit($form, $form_state) {
   }
 
   // Set release state and save it
-  $rel->set_status($status);
-  $rel->set_published(FALSE);
-  $rel->set_temporary(TRUE);
+  $rel->setStatus($status);
+  $rel->setPublished(FALSE);
+  $rel->setTemporary(TRUE);
   $rel->save();
 
-  $rid = $rel->get_id();
+  $rid = $rel->getId();
 
   // Send the user to the confirmation page
   drupal_goto("project/{$project->short_name}/packagers/{$packager->pid}/release/confirm/{$rid}");
@@ -987,22 +981,6 @@ function dproject_nodeapi($node, $op, $form) {
 
       break;
     }
-  }
-}
-
-function _dproject_append_packager_info(&$release, $path_info, &$content) {
-  if ($path_info['extension']=='info') {
-    $version = $release->get_version();
-    $node = $release->get_project_node();
-    
-    $packaging_info = array();
-    $packaging_info[] = '; Information added by ' . variable_get('site_name','unknown') . ' packaging script on ' . date('c', $release->get_created());
-    $packaging_info[] = 'version = "' . $release->version_string() . '"';
-    $packaging_info[] = 'core = "' . $version[0] . '.x"';
-    $packaging_info[] = 'project = "' . $node->short_name . '"';
-    $packaging_info[] = 'datestamp = "' . $release->get_created() . '"';
-    $packaging_info[] = 'project status url = "' . url('release-history', array('absolute'=>TRUE)) . '"';
-    $content .= "\n\n" . join("\n", $packaging_info);
   }
 }
 

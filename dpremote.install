@@ -2,6 +2,16 @@
 // $Id$
 
 function dpremote_install() {
+  module_load_include('module', 'datapoint');
+  
+  datapoint_add_source_type(array (
+    'type' => 'dpremote_project_releases',
+    'name' => 'Project releases',
+    'content_type' => '',
+    'parser' => 'datapoint_project',
+    'managed' => TRUE,
+  ));
+  
   drupal_install_schema('dpremote');
 }
 

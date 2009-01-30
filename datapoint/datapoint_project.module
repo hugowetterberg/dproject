@@ -6,6 +6,7 @@ function datapoint_project_datapoint_parser() {
     'source configuration' => '_datapoint_project_source_configuration',
     'source configuration submit' => '_datapoint_project_source_configuration_submit',
     'fetch' => '_datapoint_project_fetch',
+    'only add vertexes' => TRUE,
   );
 }
 
@@ -85,9 +86,6 @@ function _datapoint_project_datapoint_parseresult($data, $source, &$res) {
       $point->addVertex($vertex);
     }
   }
-  print_r($point);
-  print '<pre>' . htmlspecialchars($data) . '</pre>';
-  die;
 }
 
 function _datapoint_project_datapoint_parseterms($terms, $x) {

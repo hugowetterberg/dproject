@@ -34,7 +34,7 @@ class DProjectRelease {
   public function DProjectRelease($project_node) {
     $this->metadata = new stdClass();
     $this->project_node = $project_node;
-    $this->add_file_alter('_dproject_append_packager_info');
+    $this->addFileAlter('_dproject_append_packager_info');
   }
 
   /**
@@ -93,7 +93,7 @@ class DProjectRelease {
    * @return DProjectRelease
    *  A project release object or FALSE if nothing could be fetched from the result resource
    **/
-  public static function load_from_result($res, $project_node=NULL) {
+  public static function loadFromResult($res, $project_node=NULL) {
     // Get the state as an array so that we can use DProjectRelease::__set_state to create the release object
     if ($state = db_fetch_array($res)) {
       // Decode the metadata and map it to the correct state key, unset the old value
@@ -151,22 +151,21 @@ class DProjectRelease {
    *  Returns TRUE on success, otherwise FALSE will be returned
    */
   public function package() {
-    $packager = dproject_get_project_packager($this->packager);
-    $packager_type = dproject_get_packager_types($packager->packager);
+    $packager = DProjectPackager::load($this->packager);
 
-    $target = call_user_func_array($packager_type['package'], array($packager, $this));
+    $target = $packager->package($this);
 
     $zip = new ZipArchive();
-    $wd = dproject_working_directory_path($packager, $this);
-    $zip_file = dirname($wd) . '/' . $this->project_node->short_name . '-' . $this->version_string() . '.zip';
+    $wd = $packager->workingDirectory($this);
+    $zip_file = dirname($wd) . '/' . $this->project_node->short_name . '-' . $this->versionString() . '.zip';
     if ($zip->open($zip_file, ZipArchive::CREATE)===TRUE) {
       // Add the project directory to the zip archive
       $zip->addEmptyDir($this->project_node->short_name);
       // Recursively add files to the zip archive, excluding all files matching the exclude patterns
-      $this->add_to_release_zip_archive($zip, $this->project_node->short_name, $wd, $this->add_file_exclude());
+      $this->addToReleaseZipArchive($zip, $this->project_node->short_name, $wd, $this->addFileExclude());
       $zip->close();
 
-      $this->set_file($zip_file, NULL, TRUE);
+      $this->setFile($zip_file, NULL, TRUE);
 
       drupal_set_message(t('A !version release of @project has been created', array(
         '!version' => $this->version_string(),
@@ -175,7 +174,7 @@ class DProjectRelease {
       return TRUE;
     }
     else {
-      dproject_set_packager_message($packager->pid, 'dproject', 'zip-archive-create', 'Failed to create release zip file !file', array(
+      $packager->setMessage('dproject', 'zip-archive-create', 'Failed to create release zip file !file', array(
         '!file' => $zip_file,
       ));
       return FALSE;
@@ -197,13 +196,13 @@ class DProjectRelease {
    *  An array with regex patterns of filenames to exclude
    * @return void
    */
-  private function add_to_release_zip_archive($zip, $zip_dir, $dir, &$exclude=array()) {
+  private function addToReleaseZipArchive($zip, $zip_dir, $dir, &$exclude=array()) {
     $dp = opendir($dir);
     while ($file = readdir($dp)) {
-      if ($file != '.' && $file != '..' && (empty($exclude) || !$this->preg_matches_any($file, $exclude))) {
+      if ($file != '.' && $file != '..' && (empty($exclude) || !DProjectRelease::pregMatchesAny($file, $exclude))) {
         if (is_dir($dir . '/' . $file)) { // Recurse into subdirectories
           $zip->addEmptyDir($zip_dir . '/' . $file);
-          $this->add_to_release_zip_archive($zip, $zip_dir . '/' . $file, $dir . '/' . $file, $exclude);
+          $this->addToReleaseZipArchive($zip, $zip_dir . '/' . $file, $dir . '/' . $file, $exclude);
         }
         else { // Add files
           $content = $this->file_alter($dir . '/' . $file);
@@ -211,24 +210,6 @@ class DProjectRelease {
         }
       }
     }
-  }
-
-  /**
-   * Checks if a string matches any of the regex patterns
-   *
-   * @param string $string
-   *  The string to test
-   * @param string $patterns
-   *  The patterns to test against
-   * @return void
-   */
-  public function preg_matches_any($string, $patterns) {
-    foreach($patterns as $pattern) {
-      if (preg_match($pattern, $string)) {
-        return TRUE;
-      }
-    }
-    return FALSE;
   }
 
   /**
@@ -250,7 +231,7 @@ class DProjectRelease {
    * @return void
    *  This function doesn't use return values for results. A DProjectException is thrown on failure.
    **/
-  public function set_file($file_path, $md5=NULL, $tmp_file=FALSE) {
+  public function setFile($file_path, $md5=NULL, $tmp_file=FALSE) {
     //Check release file md5 checksum
     $file_md5 = md5_file($file_path);
     if (!empty($md5) && $file_md5 != $md5) {
@@ -282,7 +263,7 @@ class DProjectRelease {
    *
    * @return void This function doesn't use return values for results. A DProjectException is thrown on failure.
    **/
-  public function load_file($source_file, $md5=NULL) {
+  public function loadFile($source_file, $md5=NULL) {
     try {
       // Open the source release file for reading
       $sfp = fopen($source_file, 'r');
@@ -346,7 +327,7 @@ class DProjectRelease {
    *
    * @return void
    */
-  private function persist_file() {
+  private function persistFile() {
     if ($this->file_changed) {
       $pi = pathinfo($this->file_path);
 
@@ -380,7 +361,7 @@ class DProjectRelease {
    *
    * @return void
    */
-  public function get_file_path() {
+  public function getFilePath() {
     return $this->file_path;
   }
   
@@ -389,7 +370,7 @@ class DProjectRelease {
    *
    * @return void
    */
-  public function get_created() {
+  public function getCreated() {
     return $this->created;
   }
   
@@ -398,7 +379,7 @@ class DProjectRelease {
    *
    * @return void
    */
-  public function get_md5() {
+  public function getMd5() {
     return $this->md5;
   }
 
@@ -485,7 +466,7 @@ class DProjectRelease {
    * @return string
    *  A version string in the format 6.x-1.2[-dev]
    */
-  public function version_string() {
+  public function versionString() {
     $vs = $this->api_version . '.x';
     $vs .= '-' . $this->major_version . '.' . ($this->minor_version!=NULL?$this->minor_version:'x');
     if (!empty($this->version_extra)) {
@@ -503,7 +484,7 @@ class DProjectRelease {
    *  Returns TRUE when the version string was successfully parsed,
    *  otherwise FALSE is returned.
    */
-  public function version_from_string($version) {
+  public function versionFromString($version) {
     $matches = array();
     if (preg_match('/^(\d+)\.x-(\d+)\.(x|[\d]+)-?([_a-z0-9]+)?$/', $version, $matches)) {
       if (!empty($matches[4])) {
@@ -513,7 +494,7 @@ class DProjectRelease {
         $extra = NULL;
       }
 
-      $this->set_version($matches[1], $matches[2], $matches[3], $extra);
+      $this->setVersion($matches[1], $matches[2], $matches[3], $extra);
       return TRUE;
     }
     return FALSE;
@@ -533,7 +514,7 @@ class DProjectRelease {
    *  The extra version information (dev, beta, and so on)
    * @return void
    */
-  public function set_version($api, $major=NULL, $minor=NULL, $extra=NULL) {
+  public function setVersion($api, $major=NULL, $minor=NULL, $extra=NULL) {
     // Unpack version information if we got it as an array
     if (is_array($api)) {
       list($api, $major, $minor, $extra) = $api;
@@ -551,7 +532,7 @@ class DProjectRelease {
    *
    * @return array
    */
-  public function get_version() {
+  public function getVersion() {
     return array(
       $this->api_version,
       $this->major_version,
@@ -569,7 +550,7 @@ class DProjectRelease {
    * @param array $configuration
    *  The packager configuration data
    */
-  public function set_packager_info($packager, $configuration) {
+  public function setPackagerInfo($packager, $configuration) {
     $this->packager = $packager->pid;
     $this->metadata->packager = $configuration;
   }
@@ -580,7 +561,7 @@ class DProjectRelease {
    * @return int
    *  The id of this release
    */
-  public function get_id() {
+  public function getId() {
     return $this->rid;
   }
 
@@ -590,7 +571,7 @@ class DProjectRelease {
    * @return stdClass
    *  The project node for this release
    */
-  public function get_project_node() {
+  public function getProjectNode() {
     return $this->project_node;
   }
 
@@ -601,7 +582,7 @@ class DProjectRelease {
    *  The packager used for this release
    * @return void
    */
-  public function set_packager($pid) {
+  public function setPackager($pid) {
     $this->packager = $pid;
   }
 
@@ -611,7 +592,7 @@ class DProjectRelease {
    * @return int
    *  The packager used for this release
    */
-  public function get_packager() {
+  public function getPackager() {
     return $this->packager;
   }
 
@@ -623,7 +604,7 @@ class DProjectRelease {
    *  The status of the release
    * @return void
    */
-  public function set_status($status) {
+  public function setStatus($status) {
     $this->status = $status;
   }
 
@@ -633,7 +614,7 @@ class DProjectRelease {
    * @return int
    *  The status of this release
    */
-  public function get_status() {
+  public function getStatus() {
     return $this->status;
   }
 
@@ -644,7 +625,7 @@ class DProjectRelease {
    *  The published state of the release
    * @return void
    */
-  public function set_published($published) {
+  public function setPublished($published) {
     $this->published = $published;
   }
 
@@ -654,7 +635,7 @@ class DProjectRelease {
    * @return bool
    *  The published status of this release
    */
-  public function get_published() {
+  public function getPublished() {
     return $this->published;
   }
 
@@ -665,7 +646,7 @@ class DProjectRelease {
    *  The published state of the release
    * @return void
    */
-  public function set_temporary($temporary) {
+  public function setTemporary($temporary) {
     $this->temporary = $temporary;
   }
 
@@ -675,7 +656,7 @@ class DProjectRelease {
    * @return bool
    *  Returns TRUE if this release is temporary, otherwise FALSE is returned
    */
-  public function get_temporary() {
+  public function getTemporary() {
     return $this->temporary;
   }
 
@@ -692,7 +673,7 @@ class DProjectRelease {
    * @return string
    *  The name that is or should be used
    */
-  private function metadata_namespace_name($uri, $name=FALSE) {
+  private function metadataNamespaceName($uri, $name=FALSE) {
     $existing = get_object_vars($this->metadata);
 
     // Get the name from existing entry if the
@@ -730,8 +711,8 @@ class DProjectRelease {
    *  A reference to the stored metadata or FALSE if no metadata was stored
    *  for the namespace.
    */
-  public function get_metadata_object($name = 'dproject', $namespace = DPROJECT_NAMESPACE) {
-    $name = $this->metadata_namespace_name($namespace, $name);
+  public function getMetadataObject($name = 'dproject', $namespace = DPROJECT_NAMESPACE) {
+    $name = $this->metadataNamespaceName($namespace, $name);
     if ($name!==FALSE) {
       if (!isset($this->metadata->$name)) {
         $this->metadata->$name = (object)array(
@@ -750,7 +731,7 @@ class DProjectRelease {
    *
    * @return array
    */
-  public function get_metadata_list() {
+  public function getMetadataList() {
     $metadata = get_object_vars($this->metadata);
     $list = array();
     foreach ($metadata as $name => $cont) {
@@ -771,8 +752,8 @@ class DProjectRelease {
    * @return array
    *  Returns the registered file alters
    */
-  public function add_file_alter($callback=NULL) {
-    $metadata = $this->get_metadata_object();
+  public function addFileAlter($callback=NULL) {
+    $metadata = $this->getMetadataObject();
     if (!isset($metadata->file_alters)) {
       $metadata->file_alters = array();
     }
@@ -792,8 +773,8 @@ class DProjectRelease {
    * @return array
    *  Returns the registered file excludes
    */
-  public function add_file_exclude($exclude=NULL) {
-    $metadata = $this->get_metadata_object();
+  public function addFileExclude($exclude=NULL) {
+    $metadata = $this->getMetadataObject();
     if (!isset($metadata->file_excludes)) {
       $metadata->file_excludes = array();
     }
@@ -813,10 +794,10 @@ class DProjectRelease {
    * @return string
    *  The final contents of the file
    */
-  public function file_alter($file) {
+  public function fileAlter($file) {
     $pi = pathinfo($file);
     $content = file_get_contents($file);
-    $metadata = $this->get_metadata_object();
+    $metadata = $this->getMetadataObject();
 
     if (!empty($metadata->file_alters)) {
       foreach ($metadata->file_alters as $callback) {
@@ -825,5 +806,39 @@ class DProjectRelease {
     }
 
     return $content;
+  }
+  
+  /**
+   * Checks if a string matches any of the regex patterns
+   *
+   * @param string $string
+   *  The string to test
+   * @param string $patterns
+   *  The patterns to test against
+   * @return void
+   */
+  public static function pregMatchesAny($string, $patterns) {
+    foreach($patterns as $pattern) {
+      if (preg_match($pattern, $string)) {
+        return TRUE;
+      }
+    }
+    return FALSE;
+  }
+  
+  public static function appendPackagerInfo(&$release, $path_info, &$content) {
+    if ($path_info['extension']=='info') {
+      $version = $release->getVersion();
+      $node = $release->getProjectNode();
+
+      $packaging_info = array();
+      $packaging_info[] = '; Information added by ' . variable_get('site_name','unknown') . ' packaging script on ' . date('c', $release->getCreated());
+      $packaging_info[] = 'version = "' . $release->versionString() . '"';
+      $packaging_info[] = 'core = "' . $version[0] . '.x"';
+      $packaging_info[] = 'project = "' . $node->short_name . '"';
+      $packaging_info[] = 'datestamp = "' . $release->getCreated() . '"';
+      $packaging_info[] = 'project status url = "' . url('release-history', array('absolute'=>TRUE)) . '"';
+      $content .= "\n\n" . join("\n", $packaging_info);
+    }
   }
 }

@@ -1,5 +1,6 @@
 ; $Id$
 name = "Distributed Project"
 core = "6.x"
+php = "5.2"
 description = "A distributed project and release management system"
 package = "Project"
