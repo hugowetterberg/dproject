@@ -130,7 +130,7 @@ class DPGitPackager extends DProjectPackager implements dProjectUpdateablePackag
     $metadata = $release->getMetadataObject('git', DPGitPackager::NAMESPACE);
     $metadata->origin = $this->conf('url');
 
-    $wd = $this->workingDirectory($release);
+    $wd = $this->workingDirectory();
     $info = DPGitPackager::resolveReference($wd . '/.git', $reference);
     $release->addFileAlter('DPGitPackager::expandKeywords');
     $release->addFileExclude('/\.git.*/');

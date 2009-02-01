@@ -505,11 +505,7 @@ function _dproject_create_project_release_submit($form, $form_state) {
 
   // Set the packager for the release and store its configuration
   $rel->setPackager($packager->getId());
-  if (isset($packager_type['configure release'])) {
-    call_user_func_array($packager_type['configure release'], array(
-      &$rel, $packager, $values['source_identifier'],
-    ));
-  }
+  $packager->configureRelease($rel, $values['source_identifier']);
 
   // Set release type information
   $release_type = array();
