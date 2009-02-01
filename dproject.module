@@ -37,7 +37,7 @@ function dproject_menu() {
     'type' => MENUITEM_CALLBACK,
   );
 
-  $items['dproject/ahah/release_source_configuration/%node/%'] = array(
+  $items['dproject/ahah/release_source_configuration/%node/%dprojectpackager'] = array(
     'page callback' => '_dproject_ahah_release_source_configuration',
     'page arguments' => array(4),
     'access callback' => '_dproject_node_access',
@@ -150,7 +150,7 @@ function dprojectnode_load($short_name) {
  * @return stdClass
  */
 function dprojectpackager_load($pid) {
-  return DProjectPackager::getPackager($pid);
+  return DProjectPackager::load($pid);
 }
 
 /**
@@ -309,7 +309,8 @@ function _dproject_project_packagers_submit($form, $form_state) {
 }
 
 function _dproject_create_project_release($form_state, $project, $packager) {
-  $last_release = $packager->getLatestRelease();
+  $dp = DProject::singleton();
+  $last_release = $dp->getLatestRelease($project);
 
   drupal_set_title(t('Create a release of !name', array('!name' => $project->title)));
   drupal_set_breadcrumb(array(
@@ -318,25 +319,19 @@ function _dproject_create_project_release($form_state, $project, $packager) {
     l('Packagers', 'project/' . $project->short_name . '/packagers'),
   ));
 
-  // Allow packagers to provide completely customized forms
-  if (isset($packager_type['custom_creation_form']) && is_callable($packager_type['custom_creation_form'])) {
-    return call_user_func($packager_type['custom_creation_form'], 
-      $form_state, $project, $packager, $packager_type, $last_release);
-  }
-
   $form = array(
     '#id' => 'dproject_create_project_release',
   );
 
   $form['pid'] = array(
     '#type' => 'value',
-    '#value' => $pid,
+    '#value' => $packager->getId(),
   );
 
   $sources = array(
     '' => t('--Select a source'),
   );
-  foreach ($packager_type['sources'] as $name => $def) {
+  foreach ($packager->getSources() as $name => $def) {
     $sources[$name] = t($def['title']);
   }
 
@@ -347,7 +342,7 @@ function _dproject_create_project_release($form_state, $project, $packager) {
       '#type' => 'select',
       '#options' => $sources,
       '#ahah' => array(
-        'path' => 'dproject/ahah/release_source_configuration/' . $packager->nid . '/' . $pid,
+        'path' => 'dproject/ahah/release_source_configuration/' . $packager->getNid() . '/' . $packager->getId(),
         'wrapper' => 'source-configuration',
       ),
     ),
@@ -359,7 +354,7 @@ function _dproject_create_project_release($form_state, $project, $packager) {
 
   $version = FALSE;
   if ($last_release) {
-    $version = $last_release->get_version();
+    $version = $last_release->getVersion();
   }
   
   $form['api_version'] = array(
@@ -392,7 +387,7 @@ function _dproject_create_project_release($form_state, $project, $packager) {
   $form['release_type'] = array(
     '#type' => 'checkboxes',
     '#title' => t('Release type'),
-    '#options' => dproject_release_types(TRUE),
+    '#options' => $dp->releaseTypes(TRUE),
     '#required' => TRUE,
   );
 
@@ -418,9 +413,7 @@ function _dproject_create_project_release($form_state, $project, $packager) {
   );
 
   // Allow the packager to alter the form
-  if (isset($packager_type['create_release_form_alter']) && is_callable($packager_type['create_release_form_alter'])) {
-    call_user_func_array($packager_type['create_release_form_alter'], array(&$form, $form_state, $form['#id'], $project, $packager, $packager_type, $last_release));
-  }
+  $packager->releaseCreationFormAlter($form);
 
   return $form;
 }
@@ -436,9 +429,7 @@ function _dproject_create_project_release($form_state, $project, $packager) {
  */
 function _dproject_create_project_release_validate($form, $form_state) {
   $values = $form_state['values'];
-
-  $packager = dproject_get_project_packager($values['pid']);
-  $packager_type = dproject_get_packager_types($packager->packager);
+  $packager = DProjectPackager::load($values['pid']);
 
   // Validate the versions that always have to be integers
   $nv = array(
@@ -477,9 +468,9 @@ function _dproject_create_project_release_validate($form, $form_state) {
     form_set_error('source_name', t('You have to select a valid source for the release'));
   }
   else {
-    $source = $packager_type['sources'][$values['source_name']];
+    $source = $packager->getSources($values['source_name']);
     if (isset($source['resolve'])) {
-      $res = call_user_func_array($source['resolve'], array($packager, $values['source_identifier']));
+      $res = call_user_func_array($source['resolve'], array($values['source_identifier']));
       if ($res === FALSE) {
         form_set_error('source_identifier', t('The selected source is not valid'));
       }
@@ -500,7 +491,7 @@ function _dproject_create_project_release_validate($form, $form_state) {
 function _dproject_create_project_release_submit($form, $form_state) {
   $values = $form_state['values'];
   $packager = DProjectPackager::load($values['pid']);
-  $project = node_load($packager->nid);
+  $project = node_load($packager->getNid());
   $rel = new DProjectRelease($project);
   $metadata = $rel->getMetadataObject();
 
@@ -513,7 +504,7 @@ function _dproject_create_project_release_submit($form, $form_state) {
   $rel->setVersion($values['api_version'], $values['major_version'], $values['minor_version'], $values['version_extra']);
 
   // Set the packager for the release and store its configuration
-  $rel->setPackager($packager->pid);
+  $rel->setPackager($packager->getId());
   if (isset($packager_type['configure release'])) {
     call_user_func_array($packager_type['configure release'], array(
       &$rel, $packager, $values['source_identifier'],
@@ -556,9 +547,10 @@ function _dproject_create_project_release_submit($form, $form_state) {
   $rel->save();
 
   $rid = $rel->getId();
+  $pid = $packager->getId();
 
   // Send the user to the confirmation page
-  drupal_goto("project/{$project->short_name}/packagers/{$packager->pid}/release/confirm/{$rid}");
+  drupal_goto("project/{$project->short_name}/packagers/{$pid}/release/confirm/{$rid}");
 }
 
 /**
@@ -568,36 +560,34 @@ function _dproject_create_project_release_submit($form, $form_state) {
  *  The form array
  * @param array $form_state
  *  The form state
- * @param string $pid
- *  The id of the used packager
+ * @param string $packager
+ *  The used packager
  * @param string $rid
  *  The if of the release
  * @return void
  */
-function _dproject_confirm_project_release($form_state, $project, $pid, $rid) {
+function _dproject_confirm_project_release($form_state, $project, $packager, $rid) {
   drupal_add_css(drupal_get_path('module','dproject') . '/css/admin.css');
 
+  $dp = DProject::singleton();
   $rel = DProjectRelease::load($rid);
-  $packager = dproject_get_project_packager($rel->get_packager());
-  $packager_type = dproject_get_packager_types($packager->packager);
-  $source = $packager_type['sources'][$values['source_name']];
 
   drupal_set_title(t('Confirm release settings for !name', array('!name' => $project->title)));
 
-  $metadata = $rel->get_metadata_object();
-  $version = $rel->get_version();
+  $metadata = $rel->getMetadataObject();
+  $version = $rel->getVersion();
 
   // Fill an array with the human readable names
   // of the selected release types
   $rt = array();
-  $release_types = dproject_release_types(TRUE);
+  $release_types = $dp->releaseTypes(TRUE);
   foreach ($metadata->terms as $term) {
     if (isset($release_types[$term])) {
       $rt[] = $release_types[$term];
     }
   }
   
-  switch ($rel->get_status()) {
+  switch ($rel->getStatus()) {
     case DPROJECT_RELEASE_STATUS_UNSUPPORTED:
       $status = t('Unsupported');
     break;
@@ -614,7 +604,7 @@ function _dproject_confirm_project_release($form_state, $project, $pid, $rid) {
     '#submit' => array('_dproject_project_release_create'),
     'release' => array(
       '#type' => 'value',
-      '#value' => $rel->get_id(),
+      '#value' => $rel->getId(),
     ),
     'intro_text' => array(
       '#value' => '<p>' . t('Please confirm that the release version is correct and that the source is properly configured before creating the release') . '</p>',
@@ -623,7 +613,7 @@ function _dproject_confirm_project_release($form_state, $project, $pid, $rid) {
     'version' => array(
       '#type' => 'item',
       '#title' => t('Version'),
-      '#value' => $rel->version_string(),
+      '#value' => $rel->versionString(),
       '#weight' => -8,
     ),
     'release_status' => array(
@@ -640,14 +630,14 @@ function _dproject_confirm_project_release($form_state, $project, $pid, $rid) {
     ),
     'packager_description' => array(
       '#type' => 'item',
-      '#title' => t('Packager (@name)', array('@name' => $packager->packager)),
-      '#value' => dproject_packager_description($packager),
+      '#title' => t('Packager (@name)', array('@name' => $packager->getName())),
+      '#value' => $packager->getDescription(),
       '#weight' => -5,
     ),
     'source_description' => array(
       '#type' => 'item',
       '#title' => t('Source description'),
-      '#value' => dproject_release_source_description($rel),
+      '#value' => $packager->getSourceDescription($rel),
       '#weight' => -5,
     ),
     // TODO: The cancel link should be rewired to a middle step that deletes the
@@ -732,7 +722,7 @@ function _dproject_ahah_release_source_configuration($packager) {
 }
 
 function _dproject_release_configuration_form($source, $packager, $configuration=array()) {
-  $def = $packager->sources($source);
+  $def = $packager->getSources($source);
 
   if (isset($def['options'])) {
     $options = call_user_func($def['options'], $packager);

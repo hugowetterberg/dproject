@@ -527,7 +527,7 @@ class DPGitPackager extends DProjectPackager implements dProjectUpdateablePackag
    *
    * @return array
    */
-  public static function tagsOptions() {
+  public function tagsOptions() {
     $wdir = $this->workingDirectory();
     $options = array();
     foreach (DPGitPackager::tags($wdir . '/.git') as $tag) {
@@ -557,7 +557,7 @@ class DPGitPackager extends DProjectPackager implements dProjectUpdateablePackag
    *
    * @return array
    */
-  public static function recentCommitsOptions() {
+  public function recentCommitsOptions() {
     $wdir = $this->workingDirectory();
     $log = DPGitPackager::log($wdir . '/.git', 20, 'origin/master');
 

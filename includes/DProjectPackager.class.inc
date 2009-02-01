@@ -370,6 +370,9 @@ class DProjectPackager {
       unlink($dir);
     }
   }
+  
+  public function releaseCreationFormAlter(&$form) {
+  }
 
   /**
    * Helper function that returns a
@@ -468,7 +471,7 @@ class DProjectPackager {
    * @throws Exception
    *  A exception is thrown if packager instantiation failed
    */
-  public static function getPackager($pid) {
+  public static function load($pid) {
     // Return a cached packager if possible
     if (isset(DProjectPackager::$loadedPackagers[$row['pid']])) {
       return clone DProjectPackager::$loadedPackagers[$row['pid']];

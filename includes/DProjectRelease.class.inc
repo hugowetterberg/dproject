@@ -75,7 +75,7 @@ class DProjectRelease {
     $res = db_query("SELECT *
       FROM {dproject_release}
       WHERE rid = %d", $rid);
-    return DProjectRelease::load_from_result($res, $project_node);
+    return DProjectRelease::loadFromResult($res, $project_node);
   }
 
   /**
@@ -410,7 +410,7 @@ class DProjectRelease {
    * @return void
    */
   public function save() {
-    $this->persist_file();
+    $this->persistFile();
 
     $values = array(
       'project_nid' => $this->project_node->nid,

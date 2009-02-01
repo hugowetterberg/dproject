@@ -345,7 +345,7 @@ class DProject {
         ORDER BY api_version DESC, major_version DESC, minor_version DESC, version_extra DESC, created DESC", array(
           ':nid' => $node->nid,
         ), 0, 1);
-      return DProjectRelease::load_from_result($res, $node);
+      return DProjectRelease::loadFromResult($res, $node);
     }
 
     return FALSE;
@@ -378,7 +378,7 @@ class DProject {
           ':status' => DProject::RELEASE_STATUS_RECOMMENDED,
           ':api' => $api_version,
         ));
-      return DProjectRelease::load_from_result($res, $node);
+      return DProjectRelease::loadFromResult($res, $node);
     }
 
     return FALSE;
@@ -447,7 +447,7 @@ class DProject {
    * @return bool
    *  Returns TRUE if the value can be treated as a int
    */
-  private static function isInt($v) {
+  public static function isInt($v) {
     if (is_numeric($v) && intval($v)==$v) {
       return TRUE;
     }
