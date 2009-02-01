@@ -70,7 +70,7 @@ class DProject {
     // Store module path
     $this->modules[$module]['path'] = $impl['path'];
 
-    
+
 
     // Register the packagers
     foreach ($impl['packagers'] as $name => $info) {
@@ -305,6 +305,40 @@ class DProject {
   }
 
   /**
+   * Recursively and completely deletes a directory
+   *
+   * @param string $dir
+   *  The path to the directory
+   * @return void
+   */
+  public function deleteDirectory($dir) {
+    if (is_dir($dir)) {
+      if($dh = opendir($dir)) {
+        // Loop through the contents of the directory
+        while (FALSE !== ($obj = readdir($dh))) {
+          $path = $dir . '/' . $obj;
+          if($obj == '.' || $obj == '..') { // Skip non-content
+            continue;
+          }
+          if (is_dir($path)) { // Recurse into directories
+            $this->deleteDirectory($path);
+          }
+          else { // Delete files immediately
+            unlink($path);
+          }
+        }
+        closedir($dh);
+      }
+      rmdir($dir);
+    }
+    else if (file_exists($dir)) {
+      // We really want to delete whatever is on this path
+      // kill it even if it's a file
+      unlink($dir);
+    }
+  }
+
+  /**
    * Gets a project node by the short name
    *
    * @param string $short_name
@@ -433,7 +467,7 @@ class DProject {
       ':rid' => $rid,
     ));
   }
-  
+
   /**
    * Helper function used to check if
    * a value can be treated as a int

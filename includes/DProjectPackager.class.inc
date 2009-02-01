@@ -39,7 +39,7 @@ class DProjectPackager {
       $this->configuration = new stdClass();
     }
   }
-  
+
   /**
    * Gets the the type name of the packager
    *
@@ -194,9 +194,10 @@ class DProjectPackager {
    * @return void
    */
   public function deleted() {
+    $dp = DProject::singleton();
     $wdir = $this->workingDirectory();
     if (file_exists(dirname($wdir))) {
-      $this->deleteDirectory($wdir);
+      $dp->deleteDirectory($wdir);
     }
   }
 
@@ -337,40 +338,6 @@ class DProjectPackager {
     drupal_write_record('dproject_packager_message', $data);
   }
 
-  /**
-   * Recursively and completely deletes a directory
-   *
-   * @param string $dir
-   *  The path to the directory
-   * @return void
-   */
-  public function deleteDirectory($dir) {
-    if (is_dir($dir)) {
-      if($dh = opendir($dir)) {
-        // Loop through the contents of the directory
-        while (FALSE !== ($obj = readdir($dh))) {
-          $path = $dir . '/' . $obj;
-          if($obj == '.' || $obj == '..') { // Skip non-content
-            continue;
-          }
-          if (is_dir($path)) { // Recurse into directories
-            $this->deleteDirectory($path);
-          }
-          else { // Delete files immediately
-            unlink($path);
-          }
-        }
-        closedir($dh);
-      }
-      rmdir($dir);
-    }
-    else if (file_exists($dir)) {
-      // We really want to delete whatever is on this path
-      // kill it even if it's a file
-      unlink($dir);
-    }
-  }
-  
   public function releaseCreationFormAlter(&$form) {
   }
 
@@ -482,7 +449,7 @@ class DProjectPackager {
     ));
     return DProjectPackager::packagerFromResult($res);
   }
-  
+
   public static function newInstanceOf($packager_type) {
     $dp = DProject::singleton();
     $info = $dp->getPackagerTypes($packager_type);

@@ -202,7 +202,7 @@ class DPGitPackager extends DProjectPackager implements dProjectUpdateablePackag
   public function package($release) {
     $repo = $this->workingDirectory();
     $target = $this->workingDirectory($release);
-    $metadata = $release->get_metadata_object('git', DPGitPackager::NAMESPACE);
+    $metadata = $release->getMetadataObject('git', DPGitPackager::NAMESPACE);
 
     $out = array();
     $res = DPGitPackager::checkout($target, $repo . '/.git', $metadata->sha1, $out);

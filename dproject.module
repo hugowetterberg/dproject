@@ -118,7 +118,7 @@ function dproject_menu() {
     'access arguments' => array(1, 'view'),
     'type' => MENUITEM_CALLBACK,
   );
-  
+
   $items['release-history/%dprojectnode/%'] = array(
     'page callback' => '_dproject_feed_generate',
     'page arguments' => array(1, 2),
@@ -135,7 +135,7 @@ function dproject_menu() {
  * Menu system wildcard loader for %dprojectnode
  * allowing projects to be referenced by name
  *
- * @param string $short_name 
+ * @param string $short_name
  * @return stdClass
  */
 function dprojectnode_load($short_name) {
@@ -146,7 +146,7 @@ function dprojectnode_load($short_name) {
  * Menu system wildcard loader for %dprojectpackager
  * allowing projects to be referenced by name
  *
- * @param string $short_name 
+ * @param string $short_name
  * @return stdClass
  */
 function dprojectpackager_load($pid) {
@@ -180,7 +180,7 @@ function _dproject_packagers_redirect($node) {
 
 function _dproject_project_packagers($form_state, $node) {
   $dp = DProject::singleton();
-  
+
   drupal_set_breadcrumb(array(
     l(t('Home'), '<front>'),
     l($node->title, 'node/' . $node->nid),
@@ -188,7 +188,7 @@ function _dproject_project_packagers($form_state, $node) {
   drupal_set_title(t('!title packagers', array(
     '!title' => $node->title,
   )));
-  
+
   $packagers = $dp->getPackagerTypes();
   $pack_options = array(
     '' => t('--Select a packager')
@@ -268,44 +268,27 @@ function _dproject_project_packagers($form_state, $node) {
 function _dproject_project_packagers_validate($form, $form_state) {
   $values = $form_state['values'];
   $packager_type = $values['packager'];
-  $packagers = dproject_get_packager_types();
-  if (isset($packagers[$packager_type]) && isset($packagers[$packager_type]['configuration validate'])) {
-    call_user_func($packagers[$packager_type]['configuration validate'], $values);
-  }
+  $packager = DProjectPackager::newInstanceOf($packager_type);
+  $packager->configurationFormValidate($values);
 }
 
 function _dproject_project_packagers_submit($form, $form_state) {
   $values = $form_state['values'];
   $packager_type = $values['packager'];
-  $packagers = dproject_get_packager_types();
-  $packager = $packagers[$packager_type];
-  
-  if (isset($packager['configuration submit'])) {
-    $configuration = call_user_func($packagers[$packager_type]['configuration submit'], $values);
-  }
-  else {
-    $configuration = array();
-  }
+
+  $packager = DProjectPackager::newInstanceOf($packager_type);
+  $configuration = $packager->configurationFormSubmit($values);
 
   $values = array(
     'nid' => $values['project'],
     'packager' => $packager_type,
     'configuration' => json_encode($configuration),
   );
-  // Call the packager's before save function for the packager type
-  if (isset($packagers[$packager_type]) && isset($packagers[$packager_type]['packager created'])) {
-    $pid = db_last_insert_id('dproject_packager', 'pid');
-    $packager = dproject_get_project_packager($pid);
-    call_user_func($packagers[$packager_type]['packager created'], $packager);
-  }
-  drupal_write_record('dproject_packager', $values);
 
-  // Call the packager's created function for the packager type
-  if (isset($packagers[$packager_type]) && isset($packagers[$packager_type]['packager created'])) {
-    $pid = db_last_insert_id('dproject_packager', 'pid');
-    $packager = dproject_get_project_packager($pid);
-    call_user_func($packagers[$packager_type]['packager created'], $packager);
-  }
+  drupal_write_record('dproject_packager', $values);
+  $pid = db_last_insert_id('dproject_packager', 'pid');
+  $packager = DProjectPackager::load($pid);
+  $packager->created();
 }
 
 function _dproject_create_project_release($form_state, $project, $packager) {
@@ -356,7 +339,7 @@ function _dproject_create_project_release($form_state, $project, $packager) {
   if ($last_release) {
     $version = $last_release->getVersion();
   }
-  
+
   $form['api_version'] = array(
     '#type' => 'textfield',
     '#title' => t('Api version'),
@@ -398,7 +381,7 @@ function _dproject_create_project_release($form_state, $project, $packager) {
     'recommended' => t('Recommended'),
     'excl_recommended' => t('Recommended and exclusively supported'),
   );
-  
+
   $form['release_status'] = array(
     '#type' => 'select',
     '#title' => t('Release status'),
@@ -515,17 +498,17 @@ function _dproject_create_project_release_submit($form, $form_state) {
     }
   }
   $metadata->terms = $release_type;
-  
+
   // Check if this new release is exclusively supported
   if (substr($values['release_status'], 0, 5)=='excl_') {
     $metadata->exclusively_supported = TRUE;
     $values['release_status'] = substr($values['release_status'], 5);
   }
-  
+
   // Interpret the release status value
   $status = $rel->getStatus();
   switch ($values['release_status']) {
-    case 'unsupported': 
+    case 'unsupported':
       $status = DProjectRelease::UNSUPPORTED;
     break;
     case 'supported':
@@ -582,7 +565,7 @@ function _dproject_confirm_project_release($form_state, $project, $packager, $ri
       $rt[] = $release_types[$term];
     }
   }
-  
+
   switch ($rel->getStatus()) {
     case DProjectRelease::UNSUPPORTED:
       $status = t('Unsupported');
@@ -648,7 +631,7 @@ function _dproject_confirm_project_release($form_state, $project, $packager, $ri
       '#weight' => 10,
     ),
   );
-  
+
   if (isset($metadata->exclusively_supported) && $metadata->exclusively_supported) {
     $form['exclusive'] = array(
       '#type' => 'item',
@@ -659,20 +642,21 @@ function _dproject_confirm_project_release($form_state, $project, $packager, $ri
       '#weight' => -7,
     );
   }
-  
+
   return $form;
 }
 
 function _dproject_project_release_create($form, $form_state) {
+  $dp = DProject::singleton();
   $release = DProjectRelease::load($form_state['values']['release']);
 
   $release->package();
-  $release->set_published(TRUE);
-  $release->set_temporary(FALSE);
+  $release->setPublished(TRUE);
+  $release->setTemporary(FALSE);
   $release->save();
-  
-  $metadata = $release->get_metadata_object();
-  $v = $release->get_version();
+
+  $metadata = $release->getMetadataObject();
+  $v = $release->getVersion();
   // Set preceding releases with the same api-version as unsupported
   // if this release should be exclusively supported.
   if (isset($metadata->exclusively_supported) && $metadata->exclusively_supported) {
@@ -684,31 +668,31 @@ function _dproject_project_release_create($form, $form_state) {
       AND rid!=%d
       AND status!=%d", array(
         ':api' => $v[0],
-        ':rid' => $release->get_id(),
+        ':rid' => $release->getId(),
         ':status' => DProjectRelease::UNSUPPORTED,
     ));
     while ($urid = db_result($res)) {
-      dproject_change_release_status($urid, DProjectRelease::UNSUPPORTED);
+      $dp->changeReleaseStatus($urid, DProjectRelease::UNSUPPORTED);
     }
   }
   // Make sure that only one release for this api version is marked as recommended.
   // If the release was marked as exclusively supported this has already been taken
   // care of.
-  else if ($release->get_status()==DProjectRelease::RECOMMENDED) {
+  else if ($release->getStatus()==DProjectRelease::RECOMMENDED) {
     $res = db_query("SELECT rid FROM {dproject_release}
       WHERE api_version=%d
       AND rid!=%d
       AND status=%d", array(
         ':api' => $v[0],
-        ':rid' => $release->get_id(),
+        ':rid' => $release->getId(),
         ':status' => DProjectRelease::RECOMMENDED,
     ));
     while ($urid = db_result($res)) {
-      dproject_change_release_status($urid, DProjectRelease::SUPPORTED);
+      $dp->changeReleaseStatus($urid, DProjectRelease::SUPPORTED);
     }
   }
 
-  $node = $release->get_project_node();
+  $node = $release->getProjectNode();
   drupal_goto('node/' . $node->nid);
 }
 
@@ -933,10 +917,11 @@ function dproject_nodeapi($node, $op, $form) {
         // TODO: Central server check for duplicate names?
       break;
       case 'delete':
+        $dp = DProject::singleton();
         // Delete all the project packagers
-        $packagers = dproject_get_project_packagers($node->nid);
+        $packagers = DProjectPackager::getProjectPackagers($node->nid);
         foreach ($packagers as $packager) {
-          dproject_delete_project_packager($packager);
+          $packager->delete();
         }
 
         // Delete releases
@@ -945,15 +930,20 @@ function dproject_nodeapi($node, $op, $form) {
         ));
 
         // Delete all project files
-        $proj_dir = dproject_project_file_directory($node->nid);
+        $proj_dir = $dp->projectFileDirectory($node);
         if ($proj_dir) {
-          dproject_delete_directory($proj_dir);
+          $dp->deleteDirectory($proj_dir);
         }
 
         // Clean up project information
         db_query('DELETE FROM {dproject} WHERE nid=%d', array(
           ':nid' => $node->nid,
         ));
+
+        // Clean up alias
+        if (module_exists('path') && !module_exists('pathauto')) {
+          path_set_alias('node/' . $node->nid);
+        }
       break;
       case 'update':
       case 'insert':

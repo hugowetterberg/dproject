@@ -8,7 +8,7 @@ class DProjectRelease {
   const UNSUPPORTED = 0;
   const SUPPORTED = 1;
   const RECOMMENDED = 2; // Recommended releases are always supported
-  
+
   private $project_node;
 
   private $rid = 0;
@@ -39,7 +39,9 @@ class DProjectRelease {
   public function DProjectRelease($project_node) {
     $this->metadata = new stdClass();
     $this->project_node = $project_node;
-    $this->addFileAlter('_dproject_append_packager_info');
+
+    // Register a callback that adds packager and project info to .info files
+    $this->addFileAlter('DProjectRelease::appendPackagerInfo');
   }
 
   /**
@@ -173,7 +175,7 @@ class DProjectRelease {
       $this->setFile($zip_file, NULL, TRUE);
 
       drupal_set_message(t('A !version release of @project has been created', array(
-        '!version' => $this->version_string(),
+        '!version' => $this->versionString(),
         '@project' => $this->project_node->title,
       )));
       return TRUE;
@@ -210,7 +212,7 @@ class DProjectRelease {
           $this->addToReleaseZipArchive($zip, $zip_dir . '/' . $file, $dir . '/' . $file, $exclude);
         }
         else { // Add files
-          $content = $this->file_alter($dir . '/' . $file);
+          $content = $this->fileAlter($dir . '/' . $file);
           $zip->addFromString($zip_dir . '/' . $file, $content);
         }
       }
@@ -334,10 +336,11 @@ class DProjectRelease {
    */
   private function persistFile() {
     if ($this->file_changed) {
+      $dp = DProject::singleton();
       $pi = pathinfo($this->file_path);
 
       // Create the path for the release file and delete it if it exists
-      $release_path = dproject_project_file_directory($this->project_node) .
+      $release_path = $dp->projectFileDirectory($this->project_node) .
         '/releases/' . $pi['basename'];
       if (!file_exists(dirname($release_path))) {
         mkdir(dirname($release_path), 0777, TRUE);
@@ -369,7 +372,7 @@ class DProjectRelease {
   public function getFilePath() {
     return $this->file_path;
   }
-  
+
   /**
    * Gets the created timestamp of the release
    *
@@ -378,7 +381,7 @@ class DProjectRelease {
   public function getCreated() {
     return $this->created;
   }
-  
+
   /**
    * Gets the md5 hash of the release file
    *
@@ -730,7 +733,7 @@ class DProjectRelease {
     }
     return FALSE;
   }
-  
+
   /**
    * Returns all metadata as a list
    *
@@ -812,7 +815,7 @@ class DProjectRelease {
 
     return $content;
   }
-  
+
   /**
    * Checks if a string matches any of the regex patterns
    *
@@ -830,7 +833,7 @@ class DProjectRelease {
     }
     return FALSE;
   }
-  
+
   public static function appendPackagerInfo(&$release, $path_info, &$content) {
     if ($path_info['extension']=='info') {
       $version = $release->getVersion();
