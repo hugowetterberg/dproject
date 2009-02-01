@@ -17,10 +17,6 @@ class DProject {
   const DB_INTEGRITY_ERROR = 300;
   const VALIDATION_ERROR = 400;
 
-  // Release status codes
-  const RELEASE_STATUS_UNSUPPORTED = 0;
-  const RELEASE_STATUS_SUPPORTED = 1;
-  const RELEASE_STATUS_RECOMMENDED = 2; // Recommended releases are always supported
 
   private static $instance = NULL;
 

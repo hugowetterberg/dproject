@@ -22,13 +22,13 @@ class dproject_views_handler_argument_release_status extends views_handler_argum
   function release_status($status) {
     $value = '';
     switch ($status) {
-      case DPROJECT_RELEASE_STATUS_RECOMMENDED:
+      case DProjectRelease::RECOMMENDED:
         $value = t('Recommended');
         break;
-      case DPROJECT_RELEASE_STATUS_SUPPORTED:
+      case DProjectRelease::SUPPORTED:
         $value = t('Supported');
         break;
-      case DPROJECT_RELEASE_STATUS_UNSUPPORTED:
+      case DProjectRelease::UNSUPPORTED:
         $value = t('Unsupported');
         break;
     }

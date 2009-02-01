@@ -509,7 +509,7 @@ class DPGitPackager extends DProjectPackager implements dProjectUpdateablePackag
       'css' => "/* %s */\n",
     );
     if (isset($ext[$path_info['extension']])) {
-      $metadata = $release->getMetadataObject('git', DPGIT_DPROJECT_NAMESPACE);
+      $metadata = $release->getMetadataObject('git', DPGitPackager::NAMESPACE);
       $id_kw = '$Id: ' . $path_info['basename'] . ', sha1: ' . $metadata->sha1 . ' ' .
         $metadata->info->header->date . ' ' . $metadata->info->header->author . ' Exp $';
       $count = 0;

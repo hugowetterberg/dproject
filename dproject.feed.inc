@@ -41,13 +41,13 @@ function _dproject_feed_generate($pid, $api_version) {
 
   $project = $dom->createElement('project');
   $project->setAttributeNS(XML_NS, 'xmlns:dc', XML_DC_NS);
-  $project->setAttributeNS(XML_NS, 'xmlns:dproject', DPROJECT_NAMESPACE);
+  $project->setAttributeNS(XML_NS, 'xmlns:dproject', DProject::NAMESPACE);
   $dom->appendChild($project);
   module_invoke_all('dproject_feed_project_added', $node, $project);
 
   $project->appendChild($dom->createElement('title', $node->title));
   $project->appendChild($dom->createElement('short_name', $node->short_name));
-  $project->appendChild($dom->createElementNS(DPROJECT_NAMESPACE, 'dproject:nid', $node->nid));
+  $project->appendChild($dom->createElementNS(DProject::NAMESPACE, 'dproject:nid', $node->nid));
   $author = user_load($node->uid);
   if ($author) {
     $project->appendChild($dom->createElementNS(XML_DC_NS, 'dc:creator', $author->name));
@@ -88,7 +88,7 @@ function _dproject_feed_generate($pid, $api_version) {
     $release->appendChild($dom->createElement('release_link', url('project/' . $node->short_name . '/releases/' . $rel->version_string(), array('absolute'=>TRUE))));
     $release->appendChild($dom->createElement('download_link', url($rel->get_file_path(), array('absolute'=>TRUE))));
     $release->appendChild($dom->createElement('date', $rel->get_created()));
-    $release->appendChild($dom->createElementNS(DPROJECT_NAMESPACE, 'iso_date', date('c', $rel->get_created())));
+    $release->appendChild($dom->createElementNS(DProject::NAMESPACE, 'iso_date', date('c', $rel->get_created())));
     $release->appendChild($dom->createElement('mdhash', $rel->get_md5()));
 
     $terms = $release->appendChild($dom->createElement('terms'));
@@ -130,7 +130,7 @@ function _dproject_feed_add_metadata($dom, $release, $md) {
 
 function _dproject_feed_add_term($dom, $terms, $value, $release_type=TRUE) {
   if (!$release_type) {
-    return $terms->appendChild($dom->createElementNS(DPROJECT_NAMESPACE, 'dproject:tag', $value));
+    return $terms->appendChild($dom->createElementNS(DProject::NAMESPACE, 'dproject:tag', $value));
   }
 
   $term = $terms->appendChild($dom->createElement('term'));

@@ -4,6 +4,11 @@
  * A class for release management
  **/
 class DProjectRelease {
+  // Release status codes
+  const UNSUPPORTED = 0;
+  const SUPPORTED = 1;
+  const RECOMMENDED = 2; // Recommended releases are always supported
+  
   private $project_node;
 
   private $rid = 0;
@@ -11,7 +16,7 @@ class DProjectRelease {
   private $major_version = 1;
   private $minor_version = 0;
   private $version_extra = '';
-  private $status = DPROJECT_RELEASE_STATUS_SUPPORTED;
+  private $status = DProjectRelease::SUPPORTED;
   private $temporary = FALSE; // TODO: Implement auto-deletion of temporary releases
   private $published = FALSE;
   private $created = 0;
@@ -103,7 +108,7 @@ class DProjectRelease {
       // Check provided $project node so that it matches the project nid
       if (is_object($project_node) && $project_node->nid!=$state['project_nid']) {
         throw new DProjectException('The provided project node (nid: !nid) doesn\'t match the release\'s project node (nid: !pnid)',
-          array('!nid' => $project_node->nid, '!pnid' => $state['project_nid']), DPROJECT_VALIDATION_ERROR, TRUE);
+          array('!nid' => $project_node->nid, '!pnid' => $state['project_nid']), DProject::VALIDATION_ERROR, TRUE);
       }
 
       // Load the project node from the database if no $project_node was provided
@@ -111,7 +116,7 @@ class DProjectRelease {
         $project_node = node_load($state['project_nid']);
         if (!$project_node) {
           throw new DProjectException('Could not load project node for the release with the id !id, might be a orphaned release',
-            array('!rid' => $rid), DPROJECT_DB_INTEGRITY_ERROR, TRUE);
+            array('!rid' => $rid), DProject::DB_INTEGRITY_ERROR, TRUE);
         }
       }
 
@@ -236,7 +241,7 @@ class DProjectRelease {
     $file_md5 = md5_file($file_path);
     if (!empty($md5) && $file_md5 != $md5) {
       throw new DProjectException('MD5 mismatch, the data in !file doesn\'t match the checksum !md5',
-        array('!file' => $file, '!md5' => $md5), DPROJECT_CHECKSUM_ERROR, TRUE);
+        array('!file' => $file, '!md5' => $md5), DProject::CHECKSUM_ERROR, TRUE);
     }
 
     $this->file_changed = TRUE;
@@ -284,7 +289,7 @@ class DProjectRelease {
           $file_md5 = md5_file($file_path);
           if (!empty($md5) && $file_md5 != $md5) { // Abort if we have a md5 and it doesn't match
             throw new DProjectException('MD5 mismatch, the data read from !file doesn\'t match the checksum !md5',
-              array('!file' => $file, '!md5' => $md5), DPROJECT_CHECKSUM_ERROR);
+              array('!file' => $file, '!md5' => $md5), DProject::CHECKSUM_ERROR);
           }
 
           $this->file_changed = TRUE;
@@ -294,14 +299,14 @@ class DProjectRelease {
         }
         else { // Failed to create tmp file
           throw new DProjectException('Could not create temporary project release in !dir',
-            array('!dir' => dirname($this->file_path)), DPROJECT_RELEASE_FILE_WRITE_ERROR);
+            array('!dir' => dirname($this->file_path)), DProject::RELEASE_FILE_WRITE_ERROR);
         }
 
         fclose($sfp);
       }
       else { // Failed to open release file
         throw new DProjectException('Failed to open project release file !file',
-          array('!file' => $file), DPROJECT_RELEASE_FILE_READ_ERROR);
+          array('!file' => $file), DProject::RELEASE_FILE_READ_ERROR);
       }
     }
     catch (DProjectException $e) {
@@ -448,7 +453,7 @@ class DProjectRelease {
     if (!file_exists($base)) {
       if (!mkdir($base)) {
         throw new DProjectException('Could not create temporary release directory !dir',
-          array('!dir' => $base), DPROJECT_TMPDIR_ERROR);
+          array('!dir' => $base), DProject::TMPDIR_ERROR);
       }
     }
 
@@ -598,7 +603,7 @@ class DProjectRelease {
 
   /**
    * Sets the status of this release. Use one of
-   * the defined status constants DPROJECT_RELEASE_STATUS_*
+   * the defined status constants DProjectRelease::*
    *
    * @param int $status
    *  The status of the release
@@ -711,7 +716,7 @@ class DProjectRelease {
    *  A reference to the stored metadata or FALSE if no metadata was stored
    *  for the namespace.
    */
-  public function getMetadataObject($name = 'dproject', $namespace = DPROJECT_NAMESPACE) {
+  public function getMetadataObject($name = 'dproject', $namespace = DProject::NAMESPACE) {
     $name = $this->metadataNamespaceName($namespace, $name);
     if ($name!==FALSE) {
       if (!isset($this->metadata->$name)) {

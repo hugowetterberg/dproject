@@ -11,9 +11,9 @@ class dproject_views_handler_filter_release_status extends views_handler_filter_
         $options[$type] = $info->name;
       }
       $this->value_options = array(
-        DPROJECT_RELEASE_STATUS_RECOMMENDED => t('Recommended'),
-        DPROJECT_RELEASE_STATUS_SUPPORTED => t('Supported'),
-        DPROJECT_RELEASE_STATUS_UNSUPPORTED => t('Unsupported'),
+        DProjectRelease::RECOMMENDED => t('Recommended'),
+        DProjectRelease::SUPPORTED => t('Supported'),
+        DProjectRelease::UNSUPPORTED => t('Unsupported'),
       );
     }
   }
