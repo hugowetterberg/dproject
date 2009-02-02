@@ -500,24 +500,17 @@ class DPGitPackager extends DProjectPackager implements dProjectUpdateablePackag
   public static function expandKeywords(&$release, $path_info, &$content) {
     // The supported file extensions
     $ext = array(
-      'module' => '<?php // %s ?>',
-      'install' => '<?php // %s ?>',
-      'info' => "; %s\n",
-      'php' => '<?php // %s ?>',
-      'inc' => '<?php // %s ?>',
-      'js' => "// %s\n",
-      'css' => "/* %s */\n",
+      'module' => TRUE,   'inc' => TRUE,
+      'install' => TRUE,  'js' => TRUE,
+      'info' => TRUE,     'css' => TRUE,
+      'php' => TRUE,      
     );
     if (isset($ext[$path_info['extension']])) {
       $metadata = $release->getMetadataObject('git', DPGitPackager::NAMESPACE);
       $id_kw = '$Id: ' . $path_info['basename'] . ', sha1: ' . $metadata->sha1 . ' ' .
-        $metadata->info->header->date . ' ' . $metadata->info->header->author . ' Exp $';
+        date('c', strtotime($metadata->info->header->date)) . ' ' . $metadata->info->header->author . ' Exp $';
       $count = 0;
       $content = preg_replace('/\$Id\$/', $id_kw, $content, -1, $count);
-      if (!$count) {
-        $comment_style = $ext[$path_info['extension']];
-        $content = sprintf($comment_style, $id_kw) . $content;
-      }
     }
   }
 
