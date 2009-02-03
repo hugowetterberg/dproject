@@ -298,11 +298,11 @@ class DProjectPackager {
       case WATCHDOG_EMERG:
       case WATCHDOG_ALERT:
       case WATCHDOG_CRITICAL:
-      case WATCHDOG_ERROR:
-        $message_type = 'error';
         db_query("UPDATE {dproject_packager} SET status=0 WHERE pid=%d", array(
           ':pid' => $packager_id,
         ));
+      case WATCHDOG_ERROR:
+        $message_type = 'error';
       break;
       case WATCHDOG_WARNING:
         $message_type = 'warning';
@@ -320,22 +320,30 @@ class DProjectPackager {
       drupal_set_message(t($message, $args), $message_type);
     }
 
-    // Delete any old message of the same type
-    db_query("DELETE FROM {dproject_packager_message} WHERE pid=%d AND module='%s' AND name='%s'", array(
-      ':pid' => $this->getId(),
-      ':module' => $module,
-      ':name' => $error,
-    ));
-    // Add new message
-    $data = array(
-      'pid' => $this->getId(),
-      'module' => $module,
-      'name' => $error,
-      'message' => $message,
-      'message_arguments' => json_encode($args),
-      'severity' => $severity,
-    );
-    drupal_write_record('dproject_packager_message', $data);
+    // If we have a error name this should be logged to the dproject_packager_message
+    // table. Anything below WATCHDOG_WARNING will result in any existing error being cleared.
+    if (!empty($error)) {
+      // Delete any old message of the same type
+      db_query("DELETE FROM {dproject_packager_message} WHERE pid=%d AND module='%s' AND name='%s'", array(
+        ':pid' => $this->getId(),
+        ':module' => $module,
+        ':name' => $error,
+      ));
+
+      // Add everything that's a warning or worse to the message log
+      if ($severity <= WATCHDOG_WARNING) {
+        // Add new message
+        $data = array(
+          'pid' => $this->getId(),
+          'module' => $module,
+          'name' => $error,
+          'message' => $message,
+          'message_arguments' => json_encode($args),
+          'severity' => $severity,
+        );
+        drupal_write_record('dproject_packager_message', $data);
+      }
+    }
   }
 
   public function releaseCreationFormAlter(&$form) {
