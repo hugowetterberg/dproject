@@ -1,8 +1,8 @@
 <?php
 
-class DPRemotePackager extends DProjectPackager {
+class DPRemotePackager extends DProjectPackager implements dProjectUpdateablePackager {
   const NAMESPACE = 'http://goodold.se/project/dproject/dpremote';
-  
+
   /**
    * Gets the the type name of the packager
    *
@@ -11,11 +11,11 @@ class DPRemotePackager extends DProjectPackager {
   public function getTypeName() {
     return 'remote';
   }
-  
+
   public function getName() {
     return t('Remote project server');
   }
-  
+
   /**
    * Gets the url to the update feed
    *
@@ -25,7 +25,7 @@ class DPRemotePackager extends DProjectPackager {
     $project = $this->getProject();
     return $this->configuration->project_site . '/' . $project->short_name . '/' . $this->configuration->core_compatability . '.x';
   }
-  
+
   /**
    * Gets the description for the dpremote packager
    *
@@ -42,13 +42,13 @@ class DPRemotePackager extends DProjectPackager {
     $out .= '<strong>' . t('Url') . ':</strong> ' . l($url, $url);
     return $out;
   }
-  
+
   // public function getSourceDescription() {
-  //   
+  //
   // }
-  
+
   public function configurationForm() {
-    // TODO: Only one hard-coded source here now, known/discovered sources 
+    // TODO: Only one hard-coded source here now, known/discovered sources
     // should be added here too.
     $source_opts = array(
       '' => t('-- Select a server'),
@@ -104,7 +104,7 @@ class DPRemotePackager extends DProjectPackager {
 
     return $form;
   }
-  
+
   public function configurationFormValidate($values) {
     $using_known = !empty($values['project_site']);
     $using_custom = !empty($values['project_site_name']) && !empty($values['project_site_base_url']);
@@ -112,7 +112,7 @@ class DPRemotePackager extends DProjectPackager {
 
     if (!$using_known && !$using_custom) {
       if ($partial_custom) {
-        form_set_error(empty($values['project_site_name'])?'project_site_name':'project_site_base_url', 
+        form_set_error(empty($values['project_site_name'])?'project_site_name':'project_site_base_url',
           t('You must provide both name and base url when using a new project server'));
       }
       else {
@@ -122,14 +122,14 @@ class DPRemotePackager extends DProjectPackager {
     else if ($using_known && ($using_custom || $partial_custom)) {
       $known = DPRemotePackager::knownProjectServers();
       form_set_error('project_site', t('You must choose either to use a known project server or enter information for a new one, don\'t do both.'));
-      form_set_error($using_custom || empty($values['project_site_name'])?'project_site_name':'project_site_base_url', 
+      form_set_error($using_custom || empty($values['project_site_name'])?'project_site_name':'project_site_base_url',
         t('Clear name and base url fields if you want to use the known server !name. Deselect the known server!further if you want to use a new server.', array(
           '!name' => $known[$values['project_site']],
           '!further' => $partial_custom?t(' and fill in both name and base url'):'',
       )));
     }
   }
-  
+
   public function configurationFormSubmit($values) {
     if (!empty($values['project_site'])) {
       $project_site = $values['project_site'];
@@ -143,16 +143,29 @@ class DPRemotePackager extends DProjectPackager {
       'core_compatability' => $values['core_compatability'],
     );
   }
-  
-  // public abstract function update();
+
+  public function update(&$status_out=NULL) {
+    $sid = $this->configuration->datapoint_source;
+    if (datapoint_update_source($sid)) {
+      $this->setMessage('dpremote', 'feed-fetch', 'Fetched updates from !uri', array(
+          '!uri' => $this->getUpdateFeedUrl(),
+        ), WATCHDOG_INFO);
+    }
+    else {
+      $this->setMessage('dpremote', 'feed-fetch', 'Failed to fetch updates from remote project server from the uri !uri', array(
+          '!uri' => $this->getUpdateFeedUrl(),
+        ), WATCHDOG_ERROR);
+    }
+  }
+
   // public abstract function package();
   // public abstract function configureRelease();
-  
+
   public function created(&$status_out=Null) {
     $project = $this->getProject();
     $url = $this->getUpdateFeedUrl();
-    
-    datapoint_add_source(array(
+
+    $sid = datapoint_add_source(array(
       'type' => 'dpremote_project_releases',
       'name' => $project->short_name . ' ' . $this->configuration->core_compatability .'.x release history',
       'parser' => 'datapoint_project',
@@ -161,11 +174,18 @@ class DPRemotePackager extends DProjectPackager {
       ),
       'managed' => TRUE,
     ));
+
+    // Save the updated configuration with the source id
+    $this->configuration->datapoint_source = $sid;
+    drupal_write_record('dproject_packager', $v=array(
+      ':sid' => $sid,
+      ':configuration' => json_encode($this->configuration),
+    ), array('sid'));
   }
-  
+
   // public abstract function deleted();
   // public abstract function getSources();
-  
+
   public static function setKnownProjectServer($url, $name) {
     $exists = db_result(db_query("SELECT COUNT(*) FROM {dpremote_servers} WHERE url='%s'", array(
       ':url' => $url,
