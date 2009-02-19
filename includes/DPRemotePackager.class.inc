@@ -39,13 +39,160 @@ class DPRemotePackager extends DProjectPackager implements dProjectUpdateablePac
       $out .= '<strong>' . t('Server') . ':</strong> ' . $known[$this->configuration->project_site] . '<br/>';
     }
     $url = $this->getUpdateFeedUrl();
-    $out .= '<strong>' . t('Url') . ':</strong> ' . l($url, $url);
+    $out .= '<strong>' . t('Url') . ':</strong> ' . l($url, $url) . '<br/>';
+    $out .= '<strong>' . t('Release creation mode') . ':</strong> ' . $this->configuration->create_mode;
     return $out;
   }
 
-  // public function getSourceDescription() {
-  //
-  // }
+
+  /**
+   * Constructs a release creation form
+   *
+   * @param array &$form
+   *  A form array
+   * @return void
+   */
+  public function releaseCreationForm(&$form) {
+    $sources = $this->getSources();
+    $options = array(
+      '' => t('-- Select a release'),
+    );
+    foreach ($sources as $pid => $def) {
+      $options[$def['title']] = $this->getVertexOptions($pid);
+    }
+
+    $form['source'] = array(
+      '#type' => 'select',
+      '#title' => t('Source release'),
+      '#options' => $options,
+    );
+
+    $form['submit'] = array(
+      '#type' => 'submit',
+      '#value' => t('Create'),
+    );
+  }
+
+  /**
+   * Validates the release creation form
+   *
+   * @param array $form
+   *  The form array
+   * @param array $form_state
+   *  The form state
+   * @return void
+   */
+  public function releaseCreationFormValidate($form, $form_state) {
+    if (empty($form_state['values']['source'])) {
+      form_set_error('source', t('You have to select a source for the release'));
+    }
+  }
+
+  /**
+   * Handles submission of the release creation form
+   * and fills in the required
+   *
+   * @param array $form
+   *  The form array
+   * @param array $form_state
+   *  The form state
+   * @return void
+   */
+  public function releaseCreationFormSubmit($form, $form_state) {
+    $values = $form_state['values'];
+    $project = node_load($this->getNid());
+    $rel = new DProjectRelease($project);
+    $dp_source = datapoint_source($this->configuration->datapoint_source);
+    $vertex = datapoint_vertex($dp_source, $values['source']);
+    $datapoint = datapoint_by_id($vertex->pid);
+    $data = unserialize($datapoint->data);
+
+    // Get the api version from the datapoint data
+    $api_version = intval($data['api_version']);
+
+    // Set version so that we can get the version string
+    $rel->setVersion($api_version, $vertex->major_version, $vertex->minor_version, $vertex->version_extra);
+
+    // Set the packager for the release
+    $rel->setPackager($this->getId());
+
+    if ($vertex->release_metadata) {
+      $entries = json_decode($vertex->release_metadata);
+      foreach ($entries as $name => $e) {
+        $m = $rel->getMetadataObject($name, $e->namespace);
+        foreach (get_object_vars($e->data) as $key => $value) {
+          $m->$key = $value;
+        }
+      }
+    }
+
+    // Get metadata objects and set some properties
+    $metadata = $rel->getMetadataObject();
+    $rmetadata = $rel->getMetadataObject('remote', DPRemotePackager::NAMESPACE);
+    $rmetadata->source = array(
+      array(
+        'feed' => $dp_source['source configuration']['url'],
+        'file' => $vertex->file_url,
+      ),
+    );
+
+    // Decode release type terms
+    $release_terms = json_decode($vertex->release_terms);
+    $release_type = array();
+    foreach ($release_terms as $term) {
+      if ($term->name == 'Release type') {
+        switch ($term->value) {
+          case 'Bug fixes':
+            $release_type[] = 'bug_fixes';
+          break;
+          case 'New features':
+            $release_type[] = 'features';
+          break;
+          case 'Security update':
+            $release_type[] = 'security';
+          break;
+        }
+      }
+    }
+    $metadata->terms = $release_type;
+
+    // Interpret the release status value
+    $status = $rel->getStatus();
+    switch ($values['release_status']) {
+      case 'unsupported':
+        $status = DProjectRelease::UNSUPPORTED;
+      break;
+      case 'supported':
+        $status = DProjectRelease::SUPPORTED;
+      break;
+      case 'recommended':
+        $status = DProjectRelease::RECOMMENDED;
+      break;
+    }
+
+    // Set release state and save it
+    $rel->setStatus($status);
+    $rel->setPublished(FALSE);
+    $rel->setTemporary(TRUE);
+
+    print var_export($rel, TRUE);
+    print 'Source';
+    var_dump($dp_source);
+    print 'Point';
+    var_dump($datapoint);
+    print 'Point data';
+    var_dump($data);
+    print 'Vertex';
+    var_dump($vertex); die;
+
+    $rel->save();
+
+    $rid = $rel->getId();
+    $pid = $packager->getId();
+
+    // Send the user to the confirmation page
+    drupal_goto("project/{$project->short_name}/packagers/{$pid}/release/confirm/{$rid}");
+  }
 
   public function configurationForm() {
     // TODO: Only one hard-coded source here now, known/discovered sources
@@ -72,6 +219,16 @@ class DPRemotePackager extends DProjectPackager implements dProjectUpdateablePac
       '#title' => t('Core compatability'),
       '#options' => $core_compat,
       '#default_value' => $core,
+    );
+
+    $form['create_mode'] = array(
+      '#type' => 'select',
+      '#title' => t('Release creation mode'),
+      '#options' => array(
+        'manual' => t('Manual'),
+        'automatic' => t('Automatic (mirror)'),
+      ),
+      '#default_value' => 'manual',
     );
 
     $form['project_site'] = array(
@@ -110,6 +267,13 @@ class DPRemotePackager extends DProjectPackager implements dProjectUpdateablePac
     $using_custom = !empty($values['project_site_name']) && !empty($values['project_site_base_url']);
     $partial_custom = !$using_custom && (!empty($values['project_site_name']) || !empty($values['project_site_base_url']));
 
+    if ($using_custom) {
+      $known = DPRemotePackager::knownProjectServers();
+      if (isset($known[$values['project_site_base_url']])) {
+        form_set_error('project_site_base_url', t('The url that you\'re trying to register has already been added as a known server'));
+      }
+    }
+
     if (!$using_known && !$using_custom) {
       if ($partial_custom) {
         form_set_error(empty($values['project_site_name'])?'project_site_name':'project_site_base_url',
@@ -132,18 +296,30 @@ class DPRemotePackager extends DProjectPackager implements dProjectUpdateablePac
 
   public function configurationFormSubmit($values) {
     if (!empty($values['project_site'])) {
+      // The packager is using one of the known servers
       $project_site = $values['project_site'];
     }
     else {
+      // A server should be added to the list of known servers
+      drupal_write_record('dpremote_servers', $v=array(
+        'url'  => $values['project_site_base_url'],
+        'name' => $values['project_site_name'],
+      ));
       $project_site = $values['project_site_base_url'];
     }
 
     return array(
+      'create_mode' => $values['create_mode'],
       'project_site' => $project_site,
       'core_compatability' => $values['core_compatability'],
     );
   }
 
+  /**
+   * Updates the datapoint source for the packager.
+   *
+   * @return void
+   */
   public function update(&$status_out=NULL) {
     $sid = $this->configuration->datapoint_source;
     if (datapoint_update_source($sid)) {
@@ -178,13 +354,62 @@ class DPRemotePackager extends DProjectPackager implements dProjectUpdateablePac
     // Save the updated configuration with the source id
     $this->configuration->datapoint_source = $sid;
     drupal_write_record('dproject_packager', $v=array(
-      ':sid' => $sid,
-      ':configuration' => json_encode($this->configuration),
-    ), array('sid'));
+      'pid' => $this->getId(),
+      'configuration' => json_encode($this->configuration),
+    ), array('pid'));
   }
 
-  // public abstract function deleted();
-  // public abstract function getSources();
+  public function deleted() {
+
+  }
+
+  public function getSources($name=NULL) {
+    static $sources;
+
+    if (!$sources) {
+      $sources = array();
+      $sid = $this->configuration->datapoint_source;
+
+      $res = db_query("SELECT pid, name FROM {datapoint} WHERE sid=%d", array(
+        ':sid' => $sid,
+      ));
+      while ($obj = db_fetch_object($res)) {
+        $sources[$obj->pid] = array(
+          'title' => $obj->name,
+          'options' => array($this, 'getVertexOptions'),
+        );
+      }
+    }
+
+    if ($name) {
+      return $sources[$name];
+    }
+    return $sources;
+  }
+
+  public function getVertexOptions($pid) {
+    $options = array();
+
+    $res = db_query_range("SELECT vid, valid_from, major_version, minor_version, version_extra
+      FROM {datapoint_project_vertex}
+      WHERE pid=%d
+      ORDER BY valid_from DESC", array(
+        ':pid' => $pid,
+      ), 0, 10);
+    while ($obj = db_fetch_object($res)) {
+      $version = sprintf('%d.x-%d.%s',
+        $this->configuration->core_compatability,
+        $obj->major_version,
+        $obj->minor_version===NULL ? 'x' : $obj->minor_version);
+      if (!empty($obj->version_extra)) {
+        $version .= '-' . $obj->version_extra;
+      }
+      $version .= ' ' . date('(Y-m-d H:i O)', $obj->valid_from);
+      $options[$obj->vid] = $version;
+    }
+
+    return $options;
+  }
 
   public static function setKnownProjectServer($url, $name) {
     $exists = db_result(db_query("SELECT COUNT(*) FROM {dpremote_servers} WHERE url='%s'", array(

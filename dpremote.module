@@ -6,6 +6,15 @@
  **/
 
 /**
+ * Implementation of hook_autoload_info().
+ */
+function dpremote_autoload_info() {
+  return array(
+    'DPRemotePackager' => array('file' => 'includes/DPRemotePackager.class.inc'),
+  );
+}
+
+/**
  * Implementation of hook_dproject_api
  *
  * @return void
@@ -18,7 +27,6 @@ function dpremote_dproject_api() {
         'remote' => array(
           'name' => t('Remote project server'),
           'class' => 'DPRemotePackager',
-          'dependecies' => 'DProjectPackager',
         ),
       ),
     ),

@@ -346,7 +346,229 @@ class DProjectPackager {
     }
   }
 
-  public function releaseCreationFormAlter(&$form) {
+  /**
+   * Constructs a release creation form
+   *
+   * @param array &$form 
+   *  A form array
+   * @return void
+   */
+  public function releaseCreationForm(&$form) {
+    $dp = DProject::singleton();
+    $last_release = $dp->getLatestRelease($project);
+
+    $sources = array(
+      '' => t('--Select a source'),
+    );
+    foreach ($this->getSources() as $name => $def) {
+      $sources[$name] = t($def['title']);
+    }
+
+    $form['source'] = array(
+      '#type' => 'fieldset',
+      '#title' => t('Source'),
+      'source_name' => array(
+        '#type' => 'select',
+        '#options' => $sources,
+        '#ahah' => array(
+          'path' => 'dproject/ahah/release_source_configuration/' . $this->getNid() . '/' . $this->getId(),
+          'wrapper' => 'source-configuration',
+        ),
+      ),
+      'release_source_configuration' => array(
+        '#type' => 'markup',
+        '#value' => '<div id="source-configuration"></div>',
+      ),
+    );
+
+    $version = FALSE;
+    if ($last_release) {
+      $version = $last_release->getVersion();
+    }
+
+    $form['api_version'] = array(
+      '#type' => 'textfield',
+      '#title' => t('Api version'),
+      '#default_value' => $version ? $version[0] : 6,
+      '#required' => TRUE,
+    );
+
+    $form['major_version'] = array(
+      '#type' => 'textfield',
+      '#title' => t('Major version'),
+      '#default_value' => $version ? $version[1] : 1,
+      '#required' => TRUE,
+    );
+
+    $form['minor_version'] = array(
+      '#type' => 'textfield',
+      '#title' => t('Minor version'),
+      '#default_value' => $version ? $version[2] + 1 : 0,
+      '#required' => TRUE,
+    );
+
+    $form['version_extra'] = array(
+      '#type' => 'textfield',
+      '#title' => t('Version extra'),
+      '#default_value' => $version ? $version[3] : '',
+    );
+
+    $form['release_type'] = array(
+      '#type' => 'checkboxes',
+      '#title' => t('Release type'),
+      '#options' => $dp->releaseTypes(TRUE),
+      '#required' => TRUE,
+    );
+
+    $status_options = array(
+      'unsupported' => t('Unsupported'),
+      'supported' => t('Supported'),
+      'excl_supported' => t('Exclusively supported'),
+      'recommended' => t('Recommended'),
+      'excl_recommended' => t('Recommended and exclusively supported'),
+    );
+
+    $form['release_status'] = array(
+      '#type' => 'select',
+      '#title' => t('Release status'),
+      '#options' => $status_options,
+    );
+
+    $form['submit'] = array(
+      '#type' => 'submit',
+      '#value' => t('Create'),
+    );
+    
+    return $form;
+  }
+
+  /**
+   * Validates the release creation form
+   *
+   * @param array $form
+   *  The form array
+   * @param array $form_state
+   *  The form state
+   * @return void
+   */
+  public function releaseCreationFormValidate($form, $form_state) {
+    $values = $form_state['values'];
+    
+    // Validate the versions that always have to be integers
+    $nv = array(
+      'api_version' => t('Api version'),
+      'major_version' => t('Major version'),
+    );
+    foreach ($nv as $field => $title) {
+      if (!is_numeric($values[$field])) {
+        form_set_error($field, t('The !title must be a number', array(
+          '!title' => $title,
+        )));
+      }
+    }
+
+    // Validate the minor version number
+    if (!DProject::isInt($values['minor_version']) || $values['minor_version']<0) {
+      if ($values['version_extra'] != 'dev') {
+        form_set_error('version_extra', 'You must create a "dev" release if you don\'t provide a numeric minor version number equal to or greater than zero');
+      }
+      else if ($values['minor_version']!='x') {
+        drupal_set_message('Warning! The non-numeric or negative minor version number for this dev-release is interpreted as unspecified and will be replaced by an x', 'warning');
+      }
+    }
+
+    // Warn when creating a dev release with a specified minor version
+    if ($values['version_extra'] == 'dev' && DProject::isInt($values['minor_version'])) {
+      drupal_set_message('Warning! You are creating a dev release so the minor version number for this release will be set as unspecified and replaced by an x', 'warning');
+    }
+
+    // Validate the version extra format
+    if (!empty($values['version_extra']) && !preg_match('/^[_a-z0-9]+$/', $values['version_extra'])) {
+      form_set_error('version_extra', t('The version extra field can only contain lower-case letters, numbers and underscores'));
+    }
+
+    if (empty($values['source_identifier'])) {
+      form_set_error('source_name', t('You have to select a valid source for the release'));
+    }
+    else {
+      $source = $this->getSources($values['source_name']);
+      if (isset($source['resolve'])) {
+        $res = call_user_func_array($source['resolve'], array($values['source_identifier']));
+        if ($res === FALSE) {
+          form_set_error('source_identifier', t('The selected source is not valid'));
+        }
+      }
+    }
+  }
+
+  /**
+   * Handles submission of the release creation form
+   * and redirects to the confirmation page
+   *
+   * @param array $form
+   *  The form array
+   * @param array $form_state
+   *  The form state
+   * @return void
+   */
+  public function releaseCreationFormSubmit($form, $form_state) {
+    $values = $form_state['values'];
+    $project = node_load($this->getNid());
+    $rel = new DProjectRelease($project);
+    $metadata = $rel->getMetadataObject();
+
+    // Make changes in minor version number when necessary
+    if ($values['version_extra'] == 'dev' || !DProject::isInt($values['minor_version']) || $values['minor_version']<0) {
+      $values['minor_version'] = NULL;
+    }
+
+    // Set version so that we can get the version string
+    $rel->setVersion($values['api_version'], $values['major_version'], $values['minor_version'], $values['version_extra']);
+
+    // Set the packager for the release and store its configuration
+    $rel->setPackager($this->getId());
+    $this->configureRelease($rel, $values['source_identifier']);
+
+    // Set release type information
+    $release_type = array();
+    foreach ($values['release_type'] as $type) {
+      if ($type) {
+        $release_type[] = $type;
+      }
+    }
+    $metadata->terms = $release_type;
+
+    // Check if this new release is exclusively supported
+    if (substr($values['release_status'], 0, 5)=='excl_') {
+      $metadata->exclusively_supported = TRUE;
+      $values['release_status'] = substr($values['release_status'], 5);
+    }
+
+    // Interpret the release status value
+    $status = $rel->getStatus();
+    switch ($values['release_status']) {
+      case 'unsupported':
+        $status = DProjectRelease::UNSUPPORTED;
+      break;
+      case 'supported':
+        $status = DProjectRelease::SUPPORTED;
+      break;
+      case 'recommended':
+        $status = DProjectRelease::RECOMMENDED;
+      break;
+    }
+
+    // Set release state and save it
+    $rel->setStatus($status);
+    $rel->setPublished(FALSE);
+    $rel->setTemporary(TRUE);
+    $rel->save();
+
+    $rid = $rel->getId();
+    $pid = $this->getId();
+
+    // Send the user to the confirmation page
+    drupal_goto("project/{$project->short_name}/packagers/{$pid}/release/confirm/{$rid}");
   }
 
   /**

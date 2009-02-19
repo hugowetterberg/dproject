@@ -21,8 +21,6 @@ class DProject {
   private static $instance = NULL;
 
   protected $modules = array();
-  protected $classes = array();
-  protected $use_autoloader = FALSE;
   protected $packagers = array();
 
   /**
@@ -34,10 +32,6 @@ class DProject {
   public static function singleton() {
     if (!DProject::$instance) {
       DProject::$instance = new DProject();
-      // Register our autoloader if SPL is available
-      if (function_exists('spl_autoload_register')) {
-        spl_autoload_register(array(DProject::$instance,'autoloader'));
-      }
     }
     return DProject::$instance;
   }
@@ -70,72 +64,15 @@ class DProject {
     // Store module path
     $this->modules[$module]['path'] = $impl['path'];
 
-
-
     // Register the packagers
     foreach ($impl['packagers'] as $name => $info) {
       $this->packagers[$name] = $info;
-      $dependencies = isset($info['dependencies'])?(array)$info['dependencies']:array();
       $this->classes[$info['class']] = (object)array(
         'module' => $module,
-        'dependencies' => $dependencies,
         'failed' => FALSE,
       );
     }
   }
-
-  /**
-   * Helper function for loading classes for DProject
-   *
-   * @param string $class
-   *  The name of the class that should be loaded
-   */
-  public function requireClass($class) {
-    // Check so that the class is not already loaded.
-    // This will trigger the autoloader if it's set.
-    if (class_exists($class)) {
-      return TRUE;
-    }
-
-    // Falling back to manually requiring
-    // the needed files.
-    if (isset($this->classes[$class])) {
-      $c = $this->classes[$class];
-
-      // Check for previous failures.
-      if ($c->failed) {
-        return FALSE;
-      }
-
-      // Recursive calls to require dependencies.
-      foreach ($c->dependencies as $d) {
-        if (!$this->requireClass($d)) {
-          // Always fail if a dependency cannot be loaded.
-          $c->failed = TRUE;
-          return FALSE;
-        }
-      }
-
-      // Load the include file if it can be found.
-      $inc_path = $this->modules[$c->module]['path'];
-      $class_file = $inc_path . '/' . $class . '.class.inc';
-      if (!file_exists($class_file)) {
-        $c->failed = TRUE;
-        return FALSE;
-      }
-      require_once($class_file);
-    }
-    else {
-      // The class hasn't been registered with
-      // DProject, so we cannot help.
-      return FALSE;
-    }
-
-    // Check if the class is defined after
-    // loading the required files.
-    return class_exists($class);
-  }
-
 
   /**
    * Helper function for instantiating classes for DProject.
@@ -150,32 +87,13 @@ class DProject {
    *  loaded. Otherwise nothing is returned
    **/
   public function newInstanceOf($class, $arguments=array()) {
-    if ($this->requireClass($class)) {
+    if (class_exists($class)) {
       $ref = new ReflectionClass($class);
       if ($ref->isInstantiable()) {
         $i = $ref->newInstanceArgs($arguments);
         if ($ref->isInstance($i)) {
           return $i;
         }
-      }
-    }
-  }
-
-  /**
-   * A class loader function meant for use with spl_autoload_register
-   *
-   * @param class
-   *  The name of the class that should be loaded
-   * @return void
-   */
-  public function autoloader($class) {
-    // Check if the class has been registered with DProject
-    if (isset($this->classes[$class])) {
-      $inc_path = $this->modules[$c->module]['path'];
-      $class_file = $inc_path . '/' . $class . '.class.inc';
-      // Load the include file if it can be found
-      if (file_exists($class_file)) {
-        require_once($class_file);
       }
     }
   }
@@ -230,15 +148,18 @@ class DProject {
   }
 
   /**
-   * Gets the latest n releases for the specified api version
+   * Gets the latest n releases for the specified api version.
    *
    * @param stdClass|int $project
-   *  The project node or the nid of the project node
+   *  The project node or the nid of the project node.
    * @param int $api_version
    * @param string $count
+   *  Number of releases to get. Defaults to 0 (no limit).
+   * @param string $offset
+   *  The offset for the limiting count. Defaults to 0.
    * @return void
    */
-  function getReleases($project, $api_version=0, $count=0) {
+  function getReleases($project, $api_version=0, $count=10, $offset=0) {
     if (is_object($project)) {
       $node = $project;
     }
@@ -269,7 +190,7 @@ class DProject {
 
       if ($count) {
         $query_func = 'db_query_range';
-        $args[] = 0;
+        $args[] = $offset;
         $args[] = $count;
       }
       else {
@@ -277,7 +198,7 @@ class DProject {
       }
 
       $res = call_user_func_array($query_func, $args);
-      while ($rel = DProjectRelease::load_from_result($res, $node)) {
+      while ($rel = DProjectRelease::loadFromResult($res, $node)) {
         $releases[] = $rel;
       }
       return $releases;
@@ -405,7 +326,7 @@ class DProject {
         AND status=%d
         AND api_version=%d", array(
           ':nid' => $node->nid,
-          ':status' => DProject::RELEASE_STATUS_RECOMMENDED,
+          ':status' => DProjectRelease::RECOMMENDED,
           ':api' => $api_version,
         ));
       return DProjectRelease::loadFromResult($res, $node);
@@ -440,7 +361,7 @@ class DProject {
         AND status>=%d
         AND api_version=%d", array(
           ':nid' => $node->nid,
-          ':status' => DProject::RELEASE_STATUS_SUPPORTED,
+          ':status' => DProjectRelease::SUPPORTED,
           ':api' => $api_version,
         ));
 

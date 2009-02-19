@@ -60,17 +60,17 @@ class DPGitPackager extends DProjectPackager implements dProjectUpdateablePackag
   public function getSources($name=NULL) {
     $sources = array(
       'branches' => array(
-        'title' => 'Branches',
+        'title' => t('Branches'),
         'options' => array($this, 'branchesOptions'),
         'resolve' => array($this, 'referenceSha1'),
       ),
       'tags' => array(
-        'title' => 'Tags',
+        'title' => t('Tags'),
         'options' => array($this, 'tagsOptions'),
         'resolve' => array($this, 'referenceSha1'),
       ),
       'recent_commits' => array(
-        'title' => 'Recent commits',
+        'title' => t('Recent commits'),
         'options' => array($this, 'recentCommitsOptions'),
         'resolve' => array($this, 'referenceSha1'),
       ),

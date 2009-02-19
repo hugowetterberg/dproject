@@ -35,8 +35,30 @@ function _dproject_feed_generate($pid, $api_version) {
   if (is_string($api_version)) {
     $api_version = intval($api_version);
   }
+  
+  $dp = DProject::singleton();
+  
+  // Get the latest release to calculate mod-date and E-tag
+  $modified = $node->changed;
+  $latest_releases = $dp->getReleases($node, $api_version, 1);
+  if (!empty($latest_release)) {
+    $latest_release = $latest_releases[0];
+    $modified = max($latest_release->getCreated(), $modified);
+  }
+  
+  $no_change = FALSE;
+  $no_change = $no_change || (isset($_SERVER['HTTP_IF_NONE_MATCH']) && $_SERVER['HTTP_IF_NONE_MATCH']==$modified);
+  if (!$no_change && isset($_SERVER['HTTP_IF_MODIFIED_SINCE'])) {
+    $since = strtotime($_SERVER['HTTP_IF_MODIFIED_SINCE']);
+    $no_change = $since < $modified;
+  }
+  
+  if ($no_change) {
+    header('HTTP/1.1 304 Not Modified');
+    exit;
+  }
 
-  $dom = new DomDocument('1.0');
+  $dom = new DomDocument('1.0', 'utf-8');
   $dom->formatOutput = TRUE;
 
   $project = $dom->createElement('project');
@@ -54,13 +76,13 @@ function _dproject_feed_generate($pid, $api_version) {
   }
   $project->appendChild($dom->createElement('api_version', $api_version . '.x'));
 
-  $recommended = dproject_get_recommended_release($node, $api_version);
+  $recommended = $dp->getRecommendedRelease($node, $api_version);
   if ($recommended) {
     $rv = $recommended->get_version();
     $project->appendChild($dom->createElement('recommended_major', $rv[1]));
   }
 
-  $supported = dproject_get_supported_major_versions($node, $api_version);
+  $supported = $dp->getSupportedMajorVersions($node, $api_version);
   if ($supported) {
     $project->appendChild($dom->createElement('supported_major', join(',', $supported)));
     $project->appendChild($dom->createElement('default_major', min($supported)));
@@ -70,13 +92,16 @@ function _dproject_feed_generate($pid, $api_version) {
   $project->appendChild($dom->createElement('link', url('node/' . $node->nid, array('absolute'=>TRUE))));
 
   $releases = $project->appendChild($dom->createElement('releases'));
-  $rel_objects = dproject_get_releases($node, $api_version, 10);
+  $rel_objects = $dp->getReleases($node, $api_version, 9, 1);
+  if ($latest_release) {
+    array_unshift($rel_objects, $latest_release);
+  }
 
   foreach($rel_objects as $rel) {
     $release = $releases->appendChild($dom->createElement('release'));
-    $version = $rel->get_version();
-    $release->appendChild($dom->createElement('name', $node->short_name . ' ' . $rel->version_string()));
-    $release->appendChild($dom->createElement('version', $rel->version_string()));
+    $version = $rel->getVersion();
+    $release->appendChild($dom->createElement('name', $node->short_name . ' ' . $rel->versionString()));
+    $release->appendChild($dom->createElement('version', $rel->versionString()));
     $release->appendChild($dom->createElement('version_major', $version[1]));
     if (is_numeric($version[2])) {
       $release->appendChild($dom->createElement('version_patch', $version[2]));
@@ -84,17 +109,18 @@ function _dproject_feed_generate($pid, $api_version) {
     if (!empty($version[3])) {
       $release->appendChild($dom->createElement('version_extra', $version[3]));
     }
+    $release->appendChild($dom->createElement('status', $rel->getPublished()?'published':'unpublished'));
     // TODO: This release link doesn't point to anything. Implement it in the menu system.
-    $release->appendChild($dom->createElement('release_link', url('project/' . $node->short_name . '/releases/' . $rel->version_string(), array('absolute'=>TRUE))));
-    $release->appendChild($dom->createElement('download_link', url($rel->get_file_path(), array('absolute'=>TRUE))));
-    $release->appendChild($dom->createElement('date', $rel->get_created()));
-    $release->appendChild($dom->createElementNS(DProject::NAMESPACE, 'iso_date', date('c', $rel->get_created())));
-    $release->appendChild($dom->createElement('mdhash', $rel->get_md5()));
+    $release->appendChild($dom->createElement('release_link', url('project/' . $node->short_name . '/releases/' . $rel->versionString(), array('absolute'=>TRUE))));
+    $release->appendChild($dom->createElement('download_link', url($rel->getFilePath(), array('absolute'=>TRUE))));
+    $release->appendChild($dom->createElement('date', $rel->getCreated()));
+    $release->appendChild($dom->createElementNS(DProject::NAMESPACE, 'iso_date', date('c', $rel->getCreated())));
+    $release->appendChild($dom->createElement('mdhash', $rel->getMd5()));
 
     $terms = $release->appendChild($dom->createElement('terms'));
-    $metadata = $rel->get_metadata_object();
+    $metadata = $rel->getMetadataObject();
     $release_terms = array();
-    $release_types = dproject_release_types(FALSE);
+    $release_types = $dp->releaseTypes(FALSE);
     foreach ($metadata->terms as $term) {
       if (isset($release_types[$term])) {
         _dproject_feed_add_term($dom, $terms, $release_types[$term]);
@@ -104,7 +130,7 @@ function _dproject_feed_generate($pid, $api_version) {
       }
     }
 
-    $mdata_list = $rel->get_metadata_list();
+    $mdata_list = $rel->getMetadataList();
     foreach ($mdata_list as $md) {
       // Register the metadata namespace if needed. Use the existing 
       // prefix if it's defined.
@@ -119,6 +145,11 @@ function _dproject_feed_generate($pid, $api_version) {
     }
   }
 
+  header('Last-Modified: ' . date('r', $modified));
+  header('Expires: ' . date('r', $modified+60));
+  header('ETag: ' . $modified);
+  header('Cache-Control: max-age=60, public');
+  header('Content-Type: text/xml; charset=utf-8');
   print $dom->saveXML();
   die;
 }
