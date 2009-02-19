@@ -207,6 +207,7 @@ function _dproject_node_access($node, $op) {
  **/
 function dproject_form(&$node, $form_state) {
   drupal_module_include('inc', 'dproject', 'includes/dproject.project-node');
+  _dproject_form($node, $form_state);
 }
 
 /**
