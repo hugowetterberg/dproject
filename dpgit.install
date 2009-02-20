@@ -1,9 +1,10 @@
 <?php
+// $Id$
+
 /**
- * File for install, uninstall and requirement-checking hooks for dpgit
- *
- * @version $Id$
- **/
+ * @file
+ *  File for install, uninstall and requirement-checking hooks for dpgit
+ */
 
 function dpgit_uninstall() {
   variable_del('git_path');
@@ -12,20 +13,20 @@ function dpgit_uninstall() {
 function dpgit_requirements($phase) {
   $requirements = array();
   $t = get_t();
-  
+
   if ($phase=='runtime') {
     $out = array();
     $return = 0;
     $git_path = variable_get('git_path', 'git');
     exec($git_path . ' --version', $out, $return);
-    
+
     $requirements['git'] = array(
       'title' => $t('Git version'),
     );
-      
+
     if (empty($out) || $return) {
       $requirements['git']['description'] = $t('Git is not installed on your system or it\'s not on your path. !link', array(
-        '!link' => l($t('Click here to configure git'),'admin/settings/git'),
+        '!link' => l($t('Click here to configure git'), 'admin/settings/git'),
       ));
       $requirements['git']['severity'] = REQUIREMENT_ERROR;
     }
@@ -34,6 +35,6 @@ function dpgit_requirements($phase) {
       $requirements['git']['severity'] = REQUIREMENT_OK;
     }
   }
-  
+
   return $requirements;
 }

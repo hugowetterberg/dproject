@@ -1,5 +1,16 @@
 <?php
+// $Id$
 
+/**
+ * @file
+ *  Packager class that provides git integration for dproject
+ */
+
+/**
+ * Git implementation of DProjectPackager
+ *
+ * @package dpgit
+ */
 class DPGitPackager extends DProjectPackager implements dProjectUpdateablePackager {
   const NAMESPACE = 'http://goodold.se/project/dproject/dpgit';
 
@@ -75,7 +86,7 @@ class DPGitPackager extends DProjectPackager implements dProjectUpdateablePackag
         'resolve' => array($this, 'referenceSha1'),
       ),
     );
-    
+
     if ($name) {
       if (isset($sources[$name])) {
         return $sources[$name];
@@ -262,7 +273,7 @@ class DPGitPackager extends DProjectPackager implements dProjectUpdateablePackag
    *  The path to the .git directory
    *
    * @return array(string) An array with the names of the branches
-   **/
+   */
   public static function branches($repository) {
     $branches = array();
     $out = shell_exec(DPGitPackager::gitShellCommand('branch -r --no-color', $repository));
@@ -283,7 +294,7 @@ class DPGitPackager extends DProjectPackager implements dProjectUpdateablePackag
    *  The path to the .git directory
    *
    * @return array(string) An array with the names of the tags
-   **/
+   */
   public static function tags($repository) {
     $tags = array();
     $out = shell_exec(DPGitPackager::gitShellCommand('tag -l', $repository));
@@ -353,7 +364,7 @@ class DPGitPackager extends DProjectPackager implements dProjectUpdateablePackag
    * @return array
    *  The commit log as a associative arrayed keyed to the sha1 of the commit.
    *  Or the lines in the log in a array if $raw is set to TRUE.
-   **/
+   */
   public static function log($repository, $commits=10, $sha1='HEAD', $file='.', $raw=FALSE) {
     $out = array();
     $retval = 0;
@@ -393,15 +404,15 @@ class DPGitPackager extends DProjectPackager implements dProjectUpdateablePackag
       $i++;
       $match = array();
       $info['header'] = array();
-      while(!empty($out[$i]) && preg_match('/^([^:]+):\s*(.+)$/', $out[$i], $match)) {
-        $info['header'][strtolower($match[1])] = $match[2];
+      while (!empty($out[$i]) && preg_match('/^([^:]+):\s*(.+)$/', $out[$i], $match)) {
+        $info['header'][drupal_strtolower($match[1])] = $match[2];
         $i++;
       }
 
       // Extract the commit message
       $i++;
       $message = '';
-      while(!empty($out[$i])) {
+      while (!empty($out[$i])) {
         $message .= trim($out[$i]) . "\n";
         $i++;
       }
@@ -410,8 +421,8 @@ class DPGitPackager extends DProjectPackager implements dProjectUpdateablePackag
       // Get info about changes
       $i++;
       $files = array();
-      while(!empty($out[$i])) {
-        $files[substr($out[$i], 2)] = substr($out[$i], 0, 1);
+      while (!empty($out[$i])) {
+        $files[drupal_substr($out[$i], 2)] = drupal_substr($out[$i], 0, 1);
         $i++;
       }
       $info['files'] = $files;
@@ -487,7 +498,7 @@ class DPGitPackager extends DProjectPackager implements dProjectUpdateablePackag
   }
 
   /**
-   * Expands the $Id$ keywords in a file
+   * Expands the Id keywords in a file
    *
    * @param DProjectRelease $release
    *  The release that this file is part of
@@ -503,7 +514,7 @@ class DPGitPackager extends DProjectPackager implements dProjectUpdateablePackag
       'module' => TRUE,   'inc' => TRUE,
       'install' => TRUE,  'js' => TRUE,
       'info' => TRUE,     'css' => TRUE,
-      'php' => TRUE,      
+      'php' => TRUE,
     );
     if (isset($ext[$path_info['extension']])) {
       $metadata = $release->getMetadataObject('git', DPGitPackager::NAMESPACE);

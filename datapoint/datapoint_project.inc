@@ -1,6 +1,20 @@
 <?php
 // $Id$
 
+/**
+ * @file
+ *  Parser functions that have been moved here to reduce the footprint
+ *  of the module when it's not parsing release update feeds.
+ */
+
+/**
+ * Datapoint parser for project update feeds
+ *
+ * @param string $data
+ * @param array $source
+ * @param DatapointResults $res
+ * @return void
+ */
 function _datapoint_project_datapoint_parseresult($data, $source, &$res) {
   $doc = new DOMDocument();
   $doc->loadXML($data);

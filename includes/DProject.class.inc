@@ -1,9 +1,17 @@
 <?php
+// $Id$
+
+/**
+ * @file
+ *  Implementation of the DProject class
+ */
+
 
 /**
  * Core class for DProject
  *
- * @package default
+ * @package
+ *  dproject
  */
 class DProject {
   const API_VERSION = 1;
@@ -85,7 +93,7 @@ class DProject {
    * @return object
    *  Returns a instance of the requested class, if it could be
    *  loaded. Otherwise nothing is returned
-   **/
+   */
   public function newInstanceOf($class, $arguments=array()) {
     if (class_exists($class)) {
       $ref = new ReflectionClass($class);
@@ -137,8 +145,7 @@ class DProject {
         'security' => t('Security update'),
       );
     }
-    else
-    {
+    else {
       return array(
         'bug_fixes' => 'Bug fixes',
         'features' => 'New features',
@@ -159,7 +166,7 @@ class DProject {
    *  The offset for the limiting count. Defaults to 0.
    * @return void
    */
-  function getReleases($project, $api_version=0, $count=10, $offset=0) {
+  public function getReleases($project, $api_version=0, $count=10, $offset=0) {
     if (is_object($project)) {
       $node = $project;
     }
@@ -234,11 +241,11 @@ class DProject {
    */
   public function deleteDirectory($dir) {
     if (is_dir($dir)) {
-      if($dh = opendir($dir)) {
+      if ($dh = opendir($dir)) {
         // Loop through the contents of the directory
         while (FALSE !== ($obj = readdir($dh))) {
           $path = $dir . '/' . $obj;
-          if($obj == '.' || $obj == '..') { // Skip non-content
+          if ($obj == '.' || $obj == '..') { // Skip non-content
             continue;
           }
           if (is_dir($path)) { // Recurse into directories

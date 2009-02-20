@@ -1,9 +1,10 @@
 <?php
+// $Id$
+
 /**
- * The main file for the dproject module
- *
- * @version $Id$
- **/
+ * @file
+ *  The main file for the dproject module
+ */
 
 require_once('includes/dproject.token.inc');
 
@@ -20,10 +21,10 @@ function dproject_autoload_info() {
 }
 
 /**
- * Implementation of hook_node_info
+ * Implementation of hook_node_info().
  *
  * @return array The node types declared by dproject
- **/
+ */
 function dproject_node_info() {
   return array(
     'dproject' => array(
@@ -45,8 +46,8 @@ function dproject_cron() {
 }
 
 /**
- * Implementation of hook_menu
- **/
+ * Implementation of hook_menu().
+ */
 function dproject_menu() {
   $items = array();
 
@@ -201,12 +202,12 @@ function _dproject_node_access($node, $op) {
 }
 
 /**
- * Implementation of hook_form
+ * Implementation of hook_form().
  *
  * @return array The edit or create form for the node
- **/
+ */
 function dproject_form(&$node, $form_state) {
-  drupal_module_include('inc', 'dproject', 'includes/dproject.project-node');
+  drupal_module_include('inc', 'dproject', 'includes/dproject.project-admin');
   _dproject_form($node, $form_state);
 }
 
@@ -219,7 +220,7 @@ function dproject_form(&$node, $form_state) {
  *  The function to call to get the form array
  * @return void
  */
-function _dproject_ahah_helper($element, $form_callback/*, $arg1, $arg2 ...*/) {
+function _dproject_ahah_helper($element, $form_callback/* $arg1, $arg2 ... */) {
   $cached_form_state = array();
   $cached_form = form_get_cache($_POST['form_build_id'], $cached_form_state);
 
@@ -258,17 +259,17 @@ function _dproject_ahah_helper($element, $form_callback/*, $arg1, $arg2 ...*/) {
 }
 
 /**
- * Implementation of hook_nodeapi
+ * Implementation of hook_nodeapi().
  */
 function dproject_nodeapi($node, $op, $form) {
   if ($node->type=='dproject') {
-    switch($op) {
+    switch ($op) {
       case 'load':
         $res = db_query("SELECT short_name, description FROM {dproject} WHERE nid=%d", array(
           ':nid' => $node->nid,
         ));
         if ($a = db_fetch_array($res)) {
-          foreach($a as $name => $val) {
+          foreach ($a as $name => $val) {
             $node->$name = $val;
           }
         }

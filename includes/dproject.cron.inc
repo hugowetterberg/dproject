@@ -2,7 +2,13 @@
 // $Id$
 
 /**
- * Implementation of hook_cron
+ * @file
+ *  Cron implementation for dproject
+ */
+
+
+/**
+ * Implementation of hook_cron().
  */
 function _dproject_cron() {
 

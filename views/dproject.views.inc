@@ -3,8 +3,7 @@
 
 /**
  * @file
- *
- * Provide views data and handlers for dproject.module
+ *  Provide views data and handlers for dproject.module
  */
 
 /**

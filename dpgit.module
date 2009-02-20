@@ -1,9 +1,10 @@
 <?php
+// $Id$
+
 /**
- * This module provides integration with the git versioning system
- *
- * @version $Id$
- **/
+ * @file
+ *  This module provides integration with the git versioning system.
+ */
 
 /**
  * Implementation of hook_autoload_info().
@@ -15,11 +16,11 @@ function dpgit_autoload_info() {
 }
 
 /**
- * Implementation of hook_dproject_api
+ * Implementation of hook_dproject_api().
  *
  * @return void
  */
-function dpgit_dproject_api() {
+function dpgit_project_api() {
   return array(
     '1' => array(
       'path' => drupal_get_path('module', 'dpgit') . '/includes',
@@ -34,7 +35,7 @@ function dpgit_dproject_api() {
 }
 
 /**
- * Implementation of hook_theme
+ * Implementation of hook_theme().
  */
 function dpgit_theme() {
   return array(
@@ -46,13 +47,13 @@ function dpgit_theme() {
     'git_log_item' => array(
       'file' => 'includes/dpgit.inc',
       'function' => '_dpgit_theme_log_item',
-      'arguments' => array('sha1'=>'', 'item' => array()),
+      'arguments' => array('sha1' => '', 'item' => array()),
     ),
   );
 }
 
 /**
- * Implementation of hook_menu
+ * Implementation of hook_menu().
  */
 function dpgit_menu() {
   $items = array();

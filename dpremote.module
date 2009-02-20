@@ -1,9 +1,10 @@
 <?php
+// $Id$
+
 /**
- * This module provides integration with remote dproject or project servers
- *
- * @version $Id$
- **/
+ * @file
+ *  This module provides integration with remote dproject or project servers
+ */
 
 /**
  * Implementation of hook_autoload_info().
@@ -15,7 +16,7 @@ function dpremote_autoload_info() {
 }
 
 /**
- * Implementation of hook_dproject_api
+ * Implementation of hook_dproject_api().
  *
  * @return void
  */

@@ -1,4 +1,10 @@
 <?php
+// $Id$
+
+/**
+ * @file
+ *  Implementation of the vertex_schema hook for the datapoint_project module.
+ */
 
 function datapoint_project_vertex_schema() {
   return array(

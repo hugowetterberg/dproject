@@ -1,5 +1,16 @@
 <?php
+// $Id$
 
+/**
+ * @file
+ *  DProjectPackager class and packager interfaces
+ */
+
+/**
+ * Interface that must be implemented but packagers that can be updated
+ *
+ * @package dproject
+ */
 interface dProjectUpdateablePackager {
   /**
    * Fetches updates from the packager source
@@ -10,6 +21,11 @@ interface dProjectUpdateablePackager {
   public function update(&$status_out=NULL);
 }
 
+/**
+ * Base class for all project packagers
+ *
+ * @package dproject
+ */
 class DProjectPackager {
   private static $loadedPackagers = array();
 
@@ -349,7 +365,7 @@ class DProjectPackager {
   /**
    * Constructs a release creation form
    *
-   * @param array &$form 
+   * @param array &$form
    *  A form array
    * @return void
    */
@@ -438,7 +454,7 @@ class DProjectPackager {
       '#type' => 'submit',
       '#value' => t('Create'),
     );
-    
+
     return $form;
   }
 
@@ -453,7 +469,7 @@ class DProjectPackager {
    */
   public function releaseCreationFormValidate($form, $form_state) {
     $values = $form_state['values'];
-    
+
     // Validate the versions that always have to be integers
     $nv = array(
       'api_version' => t('Api version'),
@@ -539,9 +555,9 @@ class DProjectPackager {
     $metadata->terms = $release_type;
 
     // Check if this new release is exclusively supported
-    if (substr($values['release_status'], 0, 5)=='excl_') {
+    if (drupal_substr($values['release_status'], 0, 5)=='excl_') {
       $metadata->exclusively_supported = TRUE;
-      $values['release_status'] = substr($values['release_status'], 5);
+      $values['release_status'] = drupal_substr($values['release_status'], 5);
     }
 
     // Interpret the release status value
@@ -592,7 +608,7 @@ class DProjectPackager {
    *  a packager instance.
    */
   private static function packagerFromResult($res) {
-    static $mandatory = array('nid','pid','configuration','packager');
+    static $mandatory = array('nid', 'pid', 'configuration', 'packager');
     $row = is_array($res) ? $res : db_fetch_array($res);
     $dp = DProject::singleton();
 

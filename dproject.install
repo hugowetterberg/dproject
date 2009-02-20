@@ -1,13 +1,14 @@
 <?php
-/**
- * Contains implementation of install, uninstall and schema hooks for dproject.
- *
- * @version $Id$
- **/
+// $Id$
 
 /**
- * Implementation of hook_install
- **/
+ * @file
+ *  Contains implementation of install, uninstall and schema hooks for dproject.
+ */
+
+/**
+ * Implementation of hook_install().
+ */
 function dproject_install() {
   // Make sure that we get the correct path for our projects if pathauto
   // is or will be installed.
@@ -18,19 +19,19 @@ function dproject_install() {
 }
 
 /**
- * Implementation of hook_install
- **/
+ * Implementation of hook_install().
+ */
 function dproject_uninstall() {
   // Uninstall schema
   drupal_uninstall_schema('dproject');
 }
 
 /**
- * Implementation of hook_schema
+ * Implementation of hook_schema().
  *
  * @return array
  *  The database schema for dproject
- **/
+ */
 function dproject_schema() {
   $schema = array();
 

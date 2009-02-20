@@ -1,4 +1,11 @@
 <?php
+// $Id$
+
+/**
+ * @file
+ *  Views integration for dproject releases
+ */
+
 /**
  * Field handler to present a readable version number for the release.
  */

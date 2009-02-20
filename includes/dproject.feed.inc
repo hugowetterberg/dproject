@@ -1,10 +1,11 @@
 <?php
+// $Id$
+
 /**
- * Functions for working with project feeds
- *
- * @version $Id$
- **/
- 
+ * @file
+ *  Functions for working with project feeds
+ */
+
 if (!defined('XML_NS')) {
   define('XML_NS', 'http://www.w3.org/2000/xmlns/');
 }
@@ -35,9 +36,9 @@ function _dproject_feed_generate($pid, $api_version) {
   if (is_string($api_version)) {
     $api_version = intval($api_version);
   }
-  
+
   $dp = DProject::singleton();
-  
+
   // Get the latest release to calculate mod-date and E-tag
   $modified = $node->changed;
   $latest_releases = $dp->getReleases($node, $api_version, 1);
@@ -45,14 +46,14 @@ function _dproject_feed_generate($pid, $api_version) {
     $latest_release = $latest_releases[0];
     $modified = max($latest_release->getCreated(), $modified);
   }
-  
+
   $no_change = FALSE;
   $no_change = $no_change || (isset($_SERVER['HTTP_IF_NONE_MATCH']) && $_SERVER['HTTP_IF_NONE_MATCH']==$modified);
   if (!$no_change && isset($_SERVER['HTTP_IF_MODIFIED_SINCE'])) {
     $since = strtotime($_SERVER['HTTP_IF_MODIFIED_SINCE']);
     $no_change = $since < $modified;
   }
-  
+
   if ($no_change) {
     header('HTTP/1.1 304 Not Modified');
     exit;
@@ -89,7 +90,7 @@ function _dproject_feed_generate($pid, $api_version) {
   }
 
   $project->appendChild($dom->createElement('project_status', $node->status?'published':'unpublished'));
-  $project->appendChild($dom->createElement('link', url('node/' . $node->nid, array('absolute'=>TRUE))));
+  $project->appendChild($dom->createElement('link', url('node/' . $node->nid, array('absolute' => TRUE))));
 
   $releases = $project->appendChild($dom->createElement('releases'));
   $rel_objects = $dp->getReleases($node, $api_version, 9, 1);
@@ -97,7 +98,7 @@ function _dproject_feed_generate($pid, $api_version) {
     array_unshift($rel_objects, $latest_release);
   }
 
-  foreach($rel_objects as $rel) {
+  foreach ($rel_objects as $rel) {
     $release = $releases->appendChild($dom->createElement('release'));
     $version = $rel->getVersion();
     $release->appendChild($dom->createElement('name', $node->short_name . ' ' . $rel->versionString()));
@@ -111,8 +112,8 @@ function _dproject_feed_generate($pid, $api_version) {
     }
     $release->appendChild($dom->createElement('status', $rel->getPublished()?'published':'unpublished'));
     // TODO: This release link doesn't point to anything. Implement it in the menu system.
-    $release->appendChild($dom->createElement('release_link', url('project/' . $node->short_name . '/releases/' . $rel->versionString(), array('absolute'=>TRUE))));
-    $release->appendChild($dom->createElement('download_link', url($rel->getFilePath(), array('absolute'=>TRUE))));
+    $release->appendChild($dom->createElement('release_link', url('project/' . $node->short_name . '/releases/' . $rel->versionString(), array('absolute' => TRUE))));
+    $release->appendChild($dom->createElement('download_link', url($rel->getFilePath(), array('absolute' => TRUE))));
     $release->appendChild($dom->createElement('date', $rel->getCreated()));
     $release->appendChild($dom->createElementNS(DProject::NAMESPACE, 'iso_date', date('c', $rel->getCreated())));
     $release->appendChild($dom->createElement('mdhash', $rel->getMd5()));
@@ -132,7 +133,7 @@ function _dproject_feed_generate($pid, $api_version) {
 
     $mdata_list = $rel->getMetadataList();
     foreach ($mdata_list as $md) {
-      // Register the metadata namespace if needed. Use the existing 
+      // Register the metadata namespace if needed. Use the existing
       // prefix if it's defined.
       $prefix = $dom->lookupPrefix($md->namespace);
       if ($prefix) {

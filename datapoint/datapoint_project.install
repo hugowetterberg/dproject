@@ -1,4 +1,11 @@
 <?php
+// $Id$
+
+/**
+ * @file
+ *  Hook implementations for install and uninstall of the datapoint module
+ */
+
 require_once(drupal_get_path('module', 'datapoint') . '/datapoint.vertex-install.inc');
 
 function datapoint_project_schema() {

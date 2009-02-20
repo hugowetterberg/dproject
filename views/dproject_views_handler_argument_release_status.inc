@@ -1,4 +1,11 @@
 <?php
+// $Id$
+
+/**
+ * @file
+ *  Views integration for dproject releases
+ */
+
 /**
  * Argument handler to accept status.
  */

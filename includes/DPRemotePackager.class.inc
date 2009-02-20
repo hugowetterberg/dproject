@@ -1,5 +1,17 @@
 <?php
+// $Id$
 
+/**
+ * @file
+ *  DProjectPackager class
+ */
+
+/**
+ * DProjectPackager that uses the datapoints module to consume
+ * release history feeds from remote project servers.
+ *
+ * @package dpremote
+ */
 class DPRemotePackager extends DProjectPackager implements dProjectUpdateablePackager {
   const NAMESPACE = 'http://goodold.se/project/dproject/dpremote';
 
@@ -343,7 +355,7 @@ class DPRemotePackager extends DProjectPackager implements dProjectUpdateablePac
 
     $sid = datapoint_add_source(array(
       'type' => 'dpremote_project_releases',
-      'name' => $project->short_name . ' ' . $this->configuration->core_compatability .'.x release history',
+      'name' => $project->short_name . ' ' . $this->configuration->core_compatability . '.x release history',
       'parser' => 'datapoint_project',
       'source configuration' => array(
         'url' => $url,

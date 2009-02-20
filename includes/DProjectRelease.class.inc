@@ -1,8 +1,14 @@
 <?php
+// $Id$
+
+/**
+ * @file
+ *  DProjectRelease class
+ */
 
 /**
  * A class for release management
- **/
+ */
 class DProjectRelease {
   // Release status codes
   const UNSUPPORTED = 0;
@@ -35,7 +41,7 @@ class DProjectRelease {
    *
    * @param stdClass $project_node
    *  The project node that this should be a release for
-   **/
+   */
   public function DProjectRelease($project_node) {
     $this->metadata = new stdClass();
     $this->project_node = $project_node;
@@ -77,7 +83,7 @@ class DProjectRelease {
    *
    * @return DProjectRelease
    *  A project release object or FALSE if no release with the provided $rid exists
-   **/
+   */
   public static function load($rid, $project_node=NULL) {
     $res = db_query("SELECT *
       FROM {dproject_release}
@@ -99,7 +105,7 @@ class DProjectRelease {
    *
    * @return DProjectRelease
    *  A project release object or FALSE if nothing could be fetched from the result resource
-   **/
+   */
   public static function loadFromResult($res, $project_node=NULL) {
     // Get the state as an array so that we can use DProjectRelease::__set_state to create the release object
     if ($state = db_fetch_array($res)) {
@@ -114,7 +120,7 @@ class DProjectRelease {
       }
 
       // Load the project node from the database if no $project_node was provided
-      if(!is_object($project_node)) {
+      if (!is_object($project_node)) {
         $project_node = node_load($state['project_nid']);
         if (!$project_node) {
           throw new DProjectException('Could not load project node for the release with the id !id, might be a orphaned release',
@@ -140,7 +146,7 @@ class DProjectRelease {
    *
    * @return DProjectRelease
    *  A project release object
-   **/
+   */
   public static function __set_state($state) {
     $o = new DProjectRelease(NULL);
     foreach ($state as $key => $value) {
@@ -237,7 +243,7 @@ class DProjectRelease {
    *
    * @return void
    *  This function doesn't use return values for results. A DProjectException is thrown on failure.
-   **/
+   */
   public function setFile($file_path, $md5=NULL, $tmp_file=FALSE) {
     //Check release file md5 checksum
     $file_md5 = md5_file($file_path);
@@ -269,7 +275,7 @@ class DProjectRelease {
    *  when the file doesn't match the md5 hash.
    *
    * @return void This function doesn't use return values for results. A DProjectException is thrown on failure.
-   **/
+   */
   public function loadFile($source_file, $md5=NULL) {
     try {
       // Open the source release file for reading
@@ -313,7 +319,7 @@ class DProjectRelease {
     }
     catch (DProjectException $e) {
       // Log the exception to watchdog
-      $e.log();
+      $e->log();
 
       // Make sure that we close our file handles and remove temporary file
       if ($sfp) {
@@ -450,7 +456,7 @@ class DProjectRelease {
 
   /**
    * Helper function for getting a unique filename for a temporary release file
-   **/
+   */
   private function tmpFile() {
     $base = file_directory_temp() . '/dproject';
     if (!file_exists($base)) {
@@ -460,9 +466,9 @@ class DProjectRelease {
       }
     }
 
-    $filename = rand(0,10000000);
+    $filename = rand(0, 10000000);
     while (file_exists($base . '/' . $filename)) {
-      $filename = rand(0,10000000);
+      $filename = rand(0, 10000000);
     }
 
     return $base . '/' . $filename;
@@ -826,7 +832,7 @@ class DProjectRelease {
    * @return void
    */
   public static function pregMatchesAny($string, $patterns) {
-    foreach($patterns as $pattern) {
+    foreach ($patterns as $pattern) {
       if (preg_match($pattern, $string)) {
         return TRUE;
       }
@@ -840,12 +846,12 @@ class DProjectRelease {
       $node = $release->getProjectNode();
 
       $packaging_info = array();
-      $packaging_info[] = '; Information added by ' . variable_get('site_name','unknown') . ' packaging script on ' . date('c', $release->getCreated());
+      $packaging_info[] = '; Information added by ' . variable_get('site_name', 'unknown') . ' packaging script on ' . date('c', $release->getCreated());
       $packaging_info[] = 'version = "' . $release->versionString() . '"';
       $packaging_info[] = 'core = "' . $version[0] . '.x"';
       $packaging_info[] = 'project = "' . $node->short_name . '"';
       $packaging_info[] = 'datestamp = "' . $release->getCreated() . '"';
-      $packaging_info[] = 'project status url = "' . url('release-history', array('absolute'=>TRUE)) . '"';
+      $packaging_info[] = 'project status url = "' . url('release-history', array('absolute' => TRUE)) . '"';
       $content .= "\n\n" . join("\n", $packaging_info);
     }
   }

@@ -1,4 +1,11 @@
 <?php
+// $Id$
+
+/**
+ * @file
+ *  Views integration for dproject releases
+ */
+
 /**
  * Filter by status
  */

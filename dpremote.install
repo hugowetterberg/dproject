@@ -1,17 +1,22 @@
 <?php
 // $Id$
 
+/**
+ * @file
+ *  Hook implementations for install and uninstall of the dpremote module
+ */
+
 function dpremote_install() {
   module_load_include('module', 'datapoint');
-  
-  datapoint_add_source_type(array (
+
+  datapoint_add_source_type(array(
     'type' => 'dpremote_project_releases',
     'name' => 'Project releases',
     'content_type' => '',
     'parser' => 'datapoint_project',
     'managed' => TRUE,
   ));
-  
+
   drupal_install_schema('dpremote');
 }
 
@@ -42,6 +47,6 @@ function dpremote_schema() {
     ),
     'primary key' => array('url'),
   );
-  
+
   return $schema;
 }

@@ -1,9 +1,15 @@
 <?php
+// $Id$
+
+/**
+ * @file
+ *  DProjectException class
+ */
 
 /**
  * A exception that allows localization of the error message
  * and a function for logging the exception to watchdog
- **/
+ */
 class DProjectException extends Exception {
   private $tmessage;
   private $vars;
@@ -23,7 +29,7 @@ class DProjectException extends Exception {
    * @param $log
    *  Set to TRUE to immediately log the exception to watchdog, defaults to FALSE.
    *  Immediate logging will always use the severity level of WATCHDOG_ERROR.
-   **/
+   */
   public function DProjectException($message, $variables=array(), $code=0, $log=FALSE) {
     parent::__construct(t($message, $variables), $code);
 
@@ -45,7 +51,7 @@ class DProjectException extends Exception {
    *
    * @see watchdog()
    * @see watchdog_severity_levels()
-   **/
+   */
   public function log($severity=WATCHDOG_ERROR, $link=NULL) {
     if (!$logged) {
       watchdog('dproject', $this->message, $this->vars, $severity, $link);
