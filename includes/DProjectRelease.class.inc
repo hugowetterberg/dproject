@@ -17,7 +17,7 @@ class DProjectRelease {
   private $minor_version = 0;
   private $version_extra = '';
   private $status = DProjectRelease::SUPPORTED;
-  private $temporary = FALSE; // TODO: Implement auto-deletion of temporary releases
+  private $temporary = FALSE;
   private $published = FALSE;
   private $created = 0;
 

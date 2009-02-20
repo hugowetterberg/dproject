@@ -40,7 +40,7 @@ function dproject_node_info() {
  * Implementation of hook_cron().
  */
 function dproject_cron() {
-  drupal_module_include('inc', 'dproject', 'includes/dproject.cron');
+  module_load_include('inc', 'dproject', 'includes/dproject.cron');
   _dproject_cron();
 }
 
