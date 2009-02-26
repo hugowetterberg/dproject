@@ -375,7 +375,7 @@ class DPRemotePackager extends DProjectPackager implements dProjectUpdateablePac
 
   }
 
-  public function getSources($name=NULL) {
+  public function getSources($name=NULL, $filter=0) {
     static $sources;
 
     if (!$sources) {
@@ -389,14 +389,15 @@ class DPRemotePackager extends DProjectPackager implements dProjectUpdateablePac
         $sources[$obj->pid] = array(
           'title' => $obj->name,
           'options' => array($this, 'getVertexOptions'),
+          'type' => DProjectPackager::SOURCES_STATIC | DProjectPackager::SOURCES_EXPLICIT | DProjectPackager::SOURCES_TRACKABLE,
         );
       }
     }
 
     if ($name) {
-      return $sources[$name];
+      return $this->filterSources($sources[$name]);
     }
-    return $sources;
+    return $this->filterSources($sources);
   }
 
   public function getVertexOptions($pid) {

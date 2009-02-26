@@ -27,6 +27,11 @@ interface dProjectUpdateablePackager {
  * @package dproject
  */
 class DProjectPackager {
+  const SOURCES_TRACKABLE = 1;
+  const SOURCES_STATIC = 2;
+  const SOURCES_EXPLICIT = 4;
+  const SOURCES_DEFAULT = 6;
+
   private static $loadedPackagers = array();
 
   private $packagerTypeName = '';
@@ -178,12 +183,44 @@ class DProjectPackager {
    *
    * @param string $name
    *  Optional. The name of the source.
-   *
+   * @param int $filter
+   *  Optional. A source type filter; one or a combination of the
+   *  DProjectPackager::SOURCES_(TRACKABLE|STATIC|EXPLICIT) constants.
+   *  Defaults to zero (no filter).
    * @return array
    *  An array of sources or a specific source if a name was supplied.
    */
   public function getSources($name=NULL) {
     return array();
+  }
+
+  /**
+   * Helper function for subclasses implementing getSources().
+   * Filters an array of sources by type.
+   *
+   * @param array $sources
+   *  An array of sources.
+   * @param int $filter
+   *  Optional. A source type filter; one or a combination of the
+   *  DProjectPackager::SOURCES_(TRACKABLE|STATIC|EXPLICIT) constants.
+   *  Defaults to zero (no filter).
+   * @return array
+   *  An array of sources or a specific source if a name was supplied.
+   */
+  protected function filterSources($sources) {
+    // Return the sources untouched if no filter was specified
+    $filter = variable_get('dproject_valid_release_source_types', self::SOURCES_DEFAULT);
+    if (!$filter || $filter == self::SOURCES_STATIC | self::SOURCES_EXPLICIT | self::SOURCES_TRACKABLE) {
+      return $sources;
+    }
+
+    $final = array();
+    foreach ($sources as $source => $def) {
+      if ($def['type'] & $filter) {
+        $final[$source] = $def;
+      }
+    }
+    return $final;
   }
 
   /**

@@ -68,32 +68,35 @@ class DPGitPackager extends DProjectPackager implements dProjectUpdateablePackag
     }
   }
 
-  public function getSources($name=NULL) {
+  public function getSources($name=NULL, $filter=0) {
     $sources = array(
       'branches' => array(
         'title' => t('Branches'),
         'options' => array($this, 'branchesOptions'),
         'resolve' => array($this, 'referenceSha1'),
+        'type' => DProjectPackager::SOURCES_TRACKABLE | DProjectPackager::SOURCES_EXPLICIT,
       ),
       'tags' => array(
         'title' => t('Tags'),
         'options' => array($this, 'tagsOptions'),
         'resolve' => array($this, 'referenceSha1'),
+        'type' => DProjectPackager::SOURCES_STATIC | DProjectPackager::SOURCES_EXPLICIT,
       ),
       'recent_commits' => array(
         'title' => t('Recent commits'),
         'options' => array($this, 'recentCommitsOptions'),
         'resolve' => array($this, 'referenceSha1'),
+        'type' => DProjectPackager::SOURCES_STATIC,
       ),
     );
 
     if ($name) {
       if (isset($sources[$name])) {
-        return $sources[$name];
+        return $this->filterSources($sources[$name], $filter);
       }
     }
     else {
-      return $sources;
+      return $this->filterSources($sources, $filter);
     }
   }
 

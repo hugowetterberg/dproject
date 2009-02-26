@@ -20,7 +20,7 @@ function dpgit_autoload_info() {
  *
  * @return void
  */
-function dpgit_project_api() {
+function dpgit_dproject_api() {
   return array(
     '1' => array(
       'path' => drupal_get_path('module', 'dpgit') . '/includes',
@@ -58,12 +58,13 @@ function dpgit_theme() {
 function dpgit_menu() {
   $items = array();
 
-  $items['admin/settings/git'] = array(
+  $items['admin/settings/dproject/git'] = array(
     'title' => 'Git settings',
+    'description' => 'Configuration options for dproject git integration',
     'page callback' => 'drupal_get_form',
     'file' => 'includes/dpgit.inc',
     'page arguments' => array('_dpgit_settings'),
-    'type' => MENU_NORMAL_ITEM,
+    'type' => MENU_LOCAL_TASK,
     'access arguments' => array('administer site configuration'),
   );
 
