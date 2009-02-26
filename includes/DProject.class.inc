@@ -38,10 +38,10 @@ class DProject {
    *  A instance of the DProject utility class
    */
   public static function singleton() {
-    if (!DProject::$instance) {
-      DProject::$instance = new DProject();
+    if (!self::$instance) {
+      self::$instance = new DProject();
     }
-    return DProject::$instance;
+    return self::$instance;
   }
 
   /**
@@ -52,8 +52,8 @@ class DProject {
     $modules = module_implements('dproject_api');
     foreach ($modules as $module) {
       $impl = call_user_func($module . '_dproject_api');
-      if (isset($impl[DProject::API_VERSION])) {
-        $this->registerApiImplementation($module, $impl[DProject::API_VERSION]);
+      if (isset($impl[self::API_VERSION])) {
+        $this->registerApiImplementation($module, $impl[self::API_VERSION]);
       }
     }
   }
