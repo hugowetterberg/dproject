@@ -207,16 +207,15 @@ class DProjectPackager {
    * @return array
    *  An array of sources or a specific source if a name was supplied.
    */
-  protected function filterSources($sources) {
+  protected function filterSources($sources, $filter=NULL) {
     // Return the sources untouched if no filter was specified
-    $filter = variable_get('dproject_valid_release_source_types', self::SOURCES_DEFAULT);
-    if (!$filter || $filter == self::SOURCES_STATIC | self::SOURCES_EXPLICIT | self::SOURCES_TRACKABLE) {
+    if (!$filter || $filter == (self::SOURCES_STATIC | self::SOURCES_EXPLICIT | self::SOURCES_TRACKABLE)) {
       return $sources;
     }
 
     $final = array();
     foreach ($sources as $source => $def) {
-      if ($def['type'] & $filter) {
+      if (($def['type'] & $filter) == $filter) {
         $final[$source] = $def;
       }
     }
@@ -413,7 +412,8 @@ class DProjectPackager {
     $sources = array(
       '' => t('--Select a source'),
     );
-    foreach ($this->getSources() as $name => $def) {
+    $release_type_filter = variable_get('dproject_valid_release_source_types', DProjectPackager::SOURCES_DEFAULT);
+    foreach ($this->getSources(NULL, $release_type_filter) as $name => $def) {
       $sources[$name] = t($def['title']);
     }
 
