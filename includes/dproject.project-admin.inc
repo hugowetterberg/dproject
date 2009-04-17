@@ -52,11 +52,6 @@ function _dproject_form(&$node, $form_state) {
   return $form;
 }
 
-function _dproject_packagers_redirect($node) {
-  drupal_goto('project/' . $node->short_name . '/packagers/');
-  die;
-}
-
 function _dproject_project_packagers($form_state, $node) {
   $dp = DProject::singleton();
 
