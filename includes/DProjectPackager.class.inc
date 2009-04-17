@@ -209,14 +209,27 @@ class DProjectPackager {
    */
   protected function filterSources($sources, $filter=NULL) {
     // Return the sources untouched if no filter was specified
-    if (!$filter || $filter == (self::SOURCES_STATIC | self::SOURCES_EXPLICIT | self::SOURCES_TRACKABLE)) {
+    if (!$filter || $filter == (self::SOURCES_STATIC | self::SOURCES_TRACKABLE)) {
       return $sources;
+    }
+
+    // Return a empty array if the filter neither allows TRACKABLE nor STATIC
+    // sources.
+    if (!($filter & (self::SOURCES_STATIC | self::SOURCES_TRACKABLE))) {
+      return array();
+    }
+
+    // Check if sources must be explicit
+    $only_explicit = $filter & self::SOURCES_EXPLICIT;
+    if ($only_explicit) {
+      $filter -= self::SOURCES_EXPLICIT;
     }
 
     $final = array();
     foreach ($sources as $source => $def) {
-      if (($def['type'] & $filter) == $filter) {
-        $final[$source] = $def;
+      if (($def['type'] & $filter) &&
+        (!$only_explicit || self::SOURCES_EXPLICIT & $def['type'])) {
+          $final[$source] = $def;
       }
     }
     return $final;
