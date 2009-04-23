@@ -194,6 +194,14 @@ function dproject_schema() {
         'not null' => TRUE,
         'default' => '',
       ),
+      'tracking' => array(
+        'description' => t('Whether this is a tracking release (snapshots)'),
+        'type' => 'int',
+        'size' => 1,
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+      ),
       'created' => array(
         'description' => t('The unix timestamp when the release was created'),
         'type' => 'int',
@@ -211,6 +219,7 @@ function dproject_schema() {
       'status' => array(
         'description' => t('The status of the release'),
         'type' => 'int',
+        'size' => 1,
         'unsigned' => TRUE,
         'not null' => TRUE,
         'default' => 0,
@@ -218,6 +227,7 @@ function dproject_schema() {
       'published' => array(
         'description' => t('The published state of the release'),
         'type' => 'int',
+        'size' => 1,
         'unsigned' => TRUE,
         'not null' => TRUE,
         'default' => 0,
@@ -225,6 +235,7 @@ function dproject_schema() {
       'temporary' => array(
         'description' => t('Whether this is a temporary release'),
         'type' => 'int',
+        'size' => 1,
         'unsigned' => TRUE,
         'not null' => TRUE,
         'default' => 0,

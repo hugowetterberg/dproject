@@ -85,6 +85,11 @@ function _dproject_project_packagers($form_state, $node) {
           'class' => 'package',
         ),
       )),
+      l(t('Create a tracking release'), 'project/' . $node->short_name . '/packagers/' . $p->getId() . '/tracking-release', array(
+        'attributes' => array(
+          'class' => 'package',
+        ),
+      )),
       l(t('Remove'), 'project/' . $node->short_name . '/packagers/' . $p->getId() . '/delete', array(
         'attributes' => array(
           'class' => 'delete',
@@ -165,8 +170,11 @@ function _dproject_project_packagers_submit($form, $form_state) {
   $packager->created();
 }
 
-function _dproject_create_project_release($form_state, $project, $packager) {
-  drupal_set_title(t('Create a release of !name', array('!name' => $project->title)));
+function _dproject_create_project_release($form_state, $project, $packager, $tracking=FALSE) {
+  drupal_set_title(t('Create a!tracking release of !name', array(
+    '!tracking' => $tracking ? ' ' . t('tracking') : '',
+    '!name' => $project->title,
+  )));
   drupal_set_breadcrumb(array(
     l(t('Home'), '<front>'),
     l($project->title, 'node/' . $project->nid),
@@ -174,6 +182,7 @@ function _dproject_create_project_release($form_state, $project, $packager) {
   ));
 
   $form = array(
+    '#tracking_release' => $tracking,
     '#id' => 'dproject_create_project_release',
     '#validate' => array('_dproject_create_project_release_validate'),
     '#submit' => array('_dproject_create_project_release_submit'),
@@ -184,7 +193,7 @@ function _dproject_create_project_release($form_state, $project, $packager) {
     '#value' => $packager->getId(),
   );
 
-  $packager->releaseCreationForm($form);
+  $packager->releaseCreationForm($form, $tracking);
   return $form;
 }
 
@@ -240,16 +249,6 @@ function _dproject_confirm_project_release($form_state, $project, $packager, $ri
   $metadata = $rel->getMetadataObject();
   $version = $rel->getVersion();
 
-  // Fill an array with the human readable names
-  // of the selected release types
-  $rt = array();
-  $release_types = $dp->releaseTypes(TRUE);
-  foreach ($metadata->terms as $term) {
-    if (isset($release_types[$term])) {
-      $rt[] = $release_types[$term];
-    }
-  }
-
   switch ($rel->getStatus()) {
     case DProjectRelease::UNSUPPORTED:
       $status = t('Unsupported');
@@ -285,12 +284,6 @@ function _dproject_confirm_project_release($form_state, $project, $packager, $ri
       '#value' => $status,
       '#weight' => -8,
     ),
-    'release_type' => array(
-      '#type' => 'item',
-      '#title' => t('Release type'),
-      '#value' => join($rt, '<br/>'),
-      '#weight' => -8,
-    ),
     'packager_description' => array(
       '#type' => 'item',
       '#title' => t('Packager (@name)', array('@name' => $packager->getName())),
@@ -315,6 +308,26 @@ function _dproject_confirm_project_release($form_state, $project, $packager, $ri
       '#weight' => 10,
     ),
   );
+
+  if (isset($metadata->terms)) {
+    // Fill an array with the human readable names
+    // of the selected release types
+    $rt = array();
+    $release_types = $dp->releaseTypes(TRUE);
+    foreach ($metadata->terms as $term) {
+      if (isset($release_types[$term])) {
+        $rt[] = $release_types[$term];
+      }
+    }
+
+    // Add release type description to the form
+    $form['release_type'] = array(
+      '#type' => 'item',
+      '#title' => t('Release type'),
+      '#value' => join($rt, '<br/>'),
+      '#weight' => -8,
+    );
+  }
 
   if (isset($metadata->exclusively_supported) && $metadata->exclusively_supported) {
     $form['exclusive'] = array(

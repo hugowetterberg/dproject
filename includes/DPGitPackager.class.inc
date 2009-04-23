@@ -68,6 +68,20 @@ class DPGitPackager extends DProjectPackager implements dProjectUpdateablePackag
     }
   }
 
+  /**
+   * Gets sources with optional name and type matching.
+   *
+   * @param string $name
+   *  Optional. The name source to get.
+   *  Set to NULL if you want all the sources.
+   * @param int $filter
+   *  Optional. The filter you want to apply to the sources. One, or a
+   *  combination of the DProjectPackager::SOURCES_* flags. Defaults to 0.
+   * @return array
+   *  A an array of zero or more sources. Or a single source if a name was
+   *  specified. If both name and filter was set and the named source didn't
+   *  match the filter, NULL will be returned.
+   */
   public function getSources($name=NULL, $filter=0) {
     $sources = array(
       'branches' => array(
@@ -92,7 +106,8 @@ class DPGitPackager extends DProjectPackager implements dProjectUpdateablePackag
 
     if ($name) {
       if (isset($sources[$name])) {
-        return $this->filterSources($sources[$name], $filter);
+        list($source) = $this->filterSources(array($sources[$name]), $filter);
+        return $source;
       }
     }
     else {

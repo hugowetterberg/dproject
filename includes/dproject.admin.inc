@@ -28,6 +28,12 @@ function _dproject_settings() {
     ),
   );
 
+  $form['require_explicit_tackable_sources'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Require explicit sources for tracking releases'),
+    '#default_value' => variable_get('dproject_require_explicit_tackable_sources', TRUE),
+  );
+
   $form['submit'] = array(
     '#type' => 'submit',
     '#value' => 'Save configuration',
@@ -45,5 +51,7 @@ function _dproject_settings_submit($form, $form_state) {
     }
   }
   variable_set('dproject_valid_release_source_types', $vrest);
+  variable_set('dproject_require_explicit_tackable_sources',
+    $form_state['values']['require_explicit_tackable_sources']);
   drupal_set_message('The DProject settings have been updated');
 }

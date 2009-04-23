@@ -416,16 +416,29 @@ class DProjectPackager {
    *
    * @param array &$form
    *  A form array
+   * @param bool $tracking
+   *  Optional. Set to TRUE if the form is for a tracking release.
+   *  Defaults to FALSE.
    * @return void
    */
-  public function releaseCreationForm(&$form) {
+  public function releaseCreationForm(&$form, $tracking=FALSE) {
     $dp = DProject::singleton();
     $last_release = $dp->getLatestRelease($project);
 
     $sources = array(
       '' => t('--Select a source'),
     );
-    $release_type_filter = variable_get('dproject_valid_release_source_types', DProjectPackager::SOURCES_DEFAULT);
+
+    if (!$tracking) {
+      $release_type_filter = variable_get('dproject_valid_release_source_types', DProjectPackager::SOURCES_DEFAULT);
+    }
+    else {
+      $release_type_filter = DProjectPackager::SOURCES_TRACKABLE;
+      if (variable_get('dproject_require_explicit_tackable_sources', TRUE)) {
+        $release_type_filter |= DProjectPackager::SOURCES_EXPLICIT;
+      }
+    }
+
     foreach ($this->getSources(NULL, $release_type_filter) as $name => $def) {
       $sources[$name] = t($def['title']);
     }
@@ -466,25 +479,27 @@ class DProjectPackager {
       '#required' => TRUE,
     );
 
-    $form['minor_version'] = array(
-      '#type' => 'textfield',
-      '#title' => t('Minor version'),
-      '#default_value' => $version ? $version[2] + 1 : 0,
-      '#required' => TRUE,
-    );
+    if (!$tracking) {
+      $form['minor_version'] = array(
+        '#type' => 'textfield',
+        '#title' => t('Minor version'),
+        '#default_value' => $version ? $version[2] + 1 : 0,
+        '#required' => TRUE,
+      );
 
-    $form['version_extra'] = array(
-      '#type' => 'textfield',
-      '#title' => t('Version extra'),
-      '#default_value' => $version ? $version[3] : '',
-    );
+      $form['version_extra'] = array(
+        '#type' => 'textfield',
+        '#title' => t('Version extra'),
+        '#default_value' => $version ? $version[3] : '',
+      );
 
-    $form['release_type'] = array(
-      '#type' => 'checkboxes',
-      '#title' => t('Release type'),
-      '#options' => $dp->releaseTypes(TRUE),
-      '#required' => TRUE,
-    );
+      $form['release_type'] = array(
+        '#type' => 'checkboxes',
+        '#title' => t('Release type'),
+        '#options' => $dp->releaseTypes(TRUE),
+        '#required' => TRUE,
+      );
+    }
 
     $status_options = array(
       'unsupported' => t('Unsupported'),
@@ -533,24 +548,26 @@ class DProjectPackager {
       }
     }
 
-    // Validate the minor version number
-    if (!DProject::isInt($values['minor_version']) || $values['minor_version']<0) {
-      if ($values['version_extra'] != 'dev') {
-        form_set_error('version_extra', 'You must create a "dev" release if you don\'t provide a numeric minor version number equal to or greater than zero');
+    if (!$form['#tracking_release']) {
+      // Validate the minor version number
+      if (!DProject::isInt($values['minor_version']) || $values['minor_version']<0) {
+        if ($values['version_extra'] != 'dev') {
+          form_set_error('version_extra', 'You must create a "dev" release if you don\'t provide a numeric minor version number equal to or greater than zero');
+        }
+        else if ($values['minor_version']!='x') {
+          drupal_set_message('Warning! The non-numeric or negative minor version number for this dev-release is interpreted as unspecified and will be replaced by an x', 'warning');
+        }
       }
-      else if ($values['minor_version']!='x') {
-        drupal_set_message('Warning! The non-numeric or negative minor version number for this dev-release is interpreted as unspecified and will be replaced by an x', 'warning');
+
+      // Warn when creating a dev release with a specified minor version
+      if ($values['version_extra'] == 'dev' && DProject::isInt($values['minor_version'])) {
+        drupal_set_message('Warning! You are creating a dev release so the minor version number for this release will be set as unspecified and replaced by an x', 'warning');
       }
-    }
 
-    // Warn when creating a dev release with a specified minor version
-    if ($values['version_extra'] == 'dev' && DProject::isInt($values['minor_version'])) {
-      drupal_set_message('Warning! You are creating a dev release so the minor version number for this release will be set as unspecified and replaced by an x', 'warning');
-    }
-
-    // Validate the version extra format
-    if (!empty($values['version_extra']) && !preg_match('/^[_a-z0-9]+$/', $values['version_extra'])) {
-      form_set_error('version_extra', t('The version extra field can only contain lower-case letters, numbers and underscores'));
+      // Validate the version extra format
+      if (!empty($values['version_extra']) && !preg_match('/^[_a-z0-9]+$/', $values['version_extra'])) {
+        form_set_error('version_extra', t('The version extra field can only contain lower-case letters, numbers and underscores'));
+      }
     }
 
     if (empty($values['source_identifier'])) {
@@ -583,9 +600,24 @@ class DProjectPackager {
     $rel = new DProjectRelease($project);
     $metadata = $rel->getMetadataObject();
 
-    // Make changes in minor version number when necessary
-    if ($values['version_extra'] == 'dev' || !DProject::isInt($values['minor_version']) || $values['minor_version']<0) {
+    if (!$form['#tracking_release']) {
+      // Make changes in minor version number when necessary
+      if ($values['version_extra'] == 'dev' || !DProject::isInt($values['minor_version']) || $values['minor_version']<0) {
+        $values['minor_version'] = NULL;
+      }
+
+      // Set release type information
+      $release_type = array();
+      foreach ($values['release_type'] as $type) {
+        if ($type) {
+          $release_type[] = $type;
+        }
+      }
+      $metadata->terms = $release_type;
+    }
+    else {
       $values['minor_version'] = NULL;
+      $values['version_extra'] = 'dev';
     }
 
     // Set version so that we can get the version string
@@ -594,15 +626,6 @@ class DProjectPackager {
     // Set the packager for the release and store its configuration
     $rel->setPackager($this->getId());
     $this->configureRelease($rel, $values['source_identifier']);
-
-    // Set release type information
-    $release_type = array();
-    foreach ($values['release_type'] as $type) {
-      if ($type) {
-        $release_type[] = $type;
-      }
-    }
-    $metadata->terms = $release_type;
 
     // Check if this new release is exclusively supported
     if (drupal_substr($values['release_status'], 0, 5)=='excl_') {

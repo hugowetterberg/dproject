@@ -120,7 +120,17 @@ function dproject_menu() {
   $items['project/%dprojectnode/packagers/%dprojectpackager/release'] = array(
     'title' => 'Create a project release',
     'page callback' => 'drupal_get_form',
-    'page arguments' => array('_dproject_create_project_release', 1, 3),
+    'page arguments' => array('_dproject_create_project_release', 1, 3, FALSE),
+    'access callback' => '_dproject_node_access',
+    'access arguments' => array(1, 'update'),
+    'file' => 'includes/dproject.project-admin.inc',
+    'type' => MENU_CALLBACK,
+  );
+
+  $items['project/%dprojectnode/packagers/%dprojectpackager/tracking-release'] = array(
+    'title' => 'Create a tracking project release',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('_dproject_create_project_release', 1, 3, TRUE),
     'access callback' => '_dproject_node_access',
     'access arguments' => array(1, 'update'),
     'file' => 'includes/dproject.project-admin.inc',
