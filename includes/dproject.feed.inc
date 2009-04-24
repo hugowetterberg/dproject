@@ -122,12 +122,14 @@ function _dproject_feed_generate($pid, $api_version) {
     $metadata = $rel->getMetadataObject();
     $release_terms = array();
     $release_types = $dp->releaseTypes(FALSE);
-    foreach ($metadata->terms as $term) {
-      if (isset($release_types[$term])) {
-        _dproject_feed_add_term($dom, $terms, $release_types[$term]);
-      }
-      else {
-        _dproject_feed_add_term($dom, $terms, $term, FALSE);
+    if ($metadata->terms) {
+      foreach ($metadata->terms as $term) {
+        if (isset($release_types[$term])) {
+          _dproject_feed_add_term($dom, $terms, $release_types[$term]);
+        }
+        else {
+          _dproject_feed_add_term($dom, $terms, $term, FALSE);
+        }
       }
     }
 
