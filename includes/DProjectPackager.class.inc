@@ -599,8 +599,9 @@ class DProjectPackager {
     $project = node_load($this->getNid());
     $rel = new DProjectRelease($project);
     $metadata = $rel->getMetadataObject();
+    $rel->setTracking($form['#tracking_release']);
 
-    if (!$form['#tracking_release']) {
+    if (!$rel->getTracking()) {
       // Make changes in minor version number when necessary
       if ($values['version_extra'] == 'dev' || !DProject::isInt($values['minor_version']) || $values['minor_version']<0) {
         $values['minor_version'] = NULL;
@@ -617,6 +618,8 @@ class DProjectPackager {
     }
     else {
       $values['minor_version'] = NULL;
+      // TODO: Give some thought to if we really want to force the tracking
+      // release to being a dev release.
       $values['version_extra'] = 'dev';
     }
 

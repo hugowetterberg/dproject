@@ -26,6 +26,7 @@ class DProjectRelease {
   private $temporary = FALSE;
   private $published = FALSE;
   private $created = 0;
+  private $tracking = FALSE;
 
   private $file_changed = FALSE;
   private $tmp_file = FALSE;
@@ -433,6 +434,7 @@ class DProjectRelease {
       'minor_version' => $this->minor_version,
       'version_extra' => $this->version_extra,
       'created' => $this->created,
+      'tracking' => $this->tracking,
       'packager' => $this->packager,
       'status' => $this->status,
       'published' => $this->published,
@@ -608,6 +610,27 @@ class DProjectRelease {
    */
   public function getPackager() {
     return $this->packager;
+  }
+
+  /**
+   * Sets the tracking status for this release
+   *
+   * @param bool $tracking
+   *  Sets whether the release should track it's source or not
+   * @return void
+   */
+  public function setTracking($tracking) {
+    $this->tracking = $tracking;
+  }
+
+  /**
+   * Gets the tracking status for this release
+   *
+   * @return bool
+   *  Whether the release should track it's source or not
+   */
+  public function getTracking() {
+    return $this->tracking;
   }
 
   /**

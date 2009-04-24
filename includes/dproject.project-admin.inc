@@ -178,7 +178,7 @@ function _dproject_create_project_release($form_state, $project, $packager, $tra
   drupal_set_breadcrumb(array(
     l(t('Home'), '<front>'),
     l($project->title, 'node/' . $project->nid),
-    l('Packagers', 'project/' . $project->short_name . '/packagers'),
+    l('Packagers', 'node/' . $project->nid . '/packagers'),
   ));
 
   $form = array(
@@ -207,7 +207,36 @@ function _dproject_create_project_release($form_state, $project, $packager, $tra
  * @return void
  */
 function _dproject_create_project_release_validate($form, $form_state) {
-  $packager = DProjectPackager::load($form_state['values']['pid']);
+  $values = $form_state['values'];
+  $packager = DProjectPackager::load($values['pid']);
+
+  // Version validation
+  // Construct version query argument array
+  $v = array(
+    ':project_nid' => $values['pid'],
+    ':api_version' => $values['api_version'],
+    ':major_version' => $values['major_version'],
+    ':minor_version' => empty($values['minor_version']) ? 
+      NULL : $values['minor_version'],
+    ':version_extra' => empty($values['version_extra']) ? 
+      '' : $values['version_extra'],
+  );
+  var_dump($v); die;
+  $exists = db_result(db_query("SELECT COUNT(project_nid) 
+    FROM {dproject_release}
+    WHERE temporary=1
+      AND project_nid=%d 
+      AND api_version=%d 
+      AND major_version=%d
+      AND minor_version=%d
+      AND version_extra='%s'",
+    $v));
+
+  // Set error if we already have a release for this version
+  if ($exists) {
+    form_set_error('', t('There is already a release with this version number.'));
+  }
+
   $packager->releaseCreationFormValidate($form, $form_state);
 }
 
@@ -308,6 +337,15 @@ function _dproject_confirm_project_release($form_state, $project, $packager, $ri
       '#weight' => 10,
     ),
   );
+
+  if ($rel->getTracking()) {
+    $form['tracking'] = array(
+      '#type' => 'item',
+      '#title' => t('Tracking'),
+      '#value' => t('This release will track it\'s source, creating snapshot releases at regular intervals.'),
+      '#weight' => -8,
+    );
+  }
 
   if (isset($metadata->terms)) {
     // Fill an array with the human readable names
