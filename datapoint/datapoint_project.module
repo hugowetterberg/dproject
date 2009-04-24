@@ -28,7 +28,7 @@ function _datapoint_project_source_configuration_submit($values) {
 }
 
 function _datapoint_project_fetch($source, &$result) {
-  drupal_module_include('inc', 'datapoint_project');
+  module_load_include('inc', 'datapoint_project');
 
   $url = $source['source configuration']['url'];
   datapoint_url_fetch($url, $source, $result, '_datapoint_project_datapoint_parseresult');
