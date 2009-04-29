@@ -1,0 +1,10 @@
+; $Id$
+name = "Distributed Project Service"
+core = "6.x"
+php = "5.2"
+description = "Provides a API for the distributed project system"
+package = "Project"
+dependencies[] = autoload
+dependencies[] = services
+dependencies[] = dproject
+dependencies[] = services_oop

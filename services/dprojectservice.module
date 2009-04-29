@@ -1,0 +1,36 @@
+<?php
+// $Id$
+
+/**
+ * Implementation of hook_autoload_info().
+ */
+function dprojectservice_autoload_info() {
+  return array(
+    'DProjectResource'          => array('file' => 'includes/DProjectResource.class.inc'),
+    'DProjectIndexQueryBuilder' => array('file' => 'includes/DProjectIndexQueryBuilder.class.inc'),
+  );
+}
+
+/**
+ * Implementation of hook_service_resource
+ */
+function dprojectservice_service_resource() {
+  return array(
+    'dproject' => ServicesOop::definitionFromClass('DProjectResource'),
+  );
+}
+
+/**
+ * Helper function for access checking. Essentially a wrapper
+ * for node_access.
+ */
+function _dprojectservice_resource_access($op='view', $args=array()) {
+  if ($op=='create') {
+    $node = $args[0];
+    $node->type = 'dproject';
+  }
+  else if (!empty($args)) {
+    $node = node_load($args[0]);
+  }
+  return $node->type == 'dproject' && node_access($op, $node);
+}
