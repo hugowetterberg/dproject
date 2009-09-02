@@ -221,7 +221,7 @@ function _dproject_create_project_release_validate($form, $form_state) {
     ':version_extra' => empty($values['version_extra']) ? 
       '' : $values['version_extra'],
   );
-  var_dump($v); die;
+
   $exists = db_result(db_query("SELECT COUNT(project_nid) 
     FROM {dproject_release}
     WHERE temporary=1
