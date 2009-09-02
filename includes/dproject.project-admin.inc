@@ -455,7 +455,7 @@ function _dproject_update_project_packager($node, $packager) {
   if (in_array("dProjectUpdateablePackager", class_implements($packager))) {
     $packager->update();
   }
-  drupal_goto('project/' . $node->short_name . '/packagers');
+  drupal_goto('node/' . $node->nid . '/packagers');
 }
 
 function _dproject_delete_project_packager($form_state, $node, $packager) {
