@@ -434,7 +434,7 @@ class DProjectPackager {
     }
     else {
       $release_type_filter = DProjectPackager::SOURCES_TRACKABLE;
-      if (variable_get('dproject_require_explicit_tackable_sources', TRUE)) {
+      if (variable_get('dproject_require_explicit_trackable_sources', TRUE)) {
         $release_type_filter |= DProjectPackager::SOURCES_EXPLICIT;
       }
     }
