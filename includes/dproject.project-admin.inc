@@ -44,11 +44,6 @@ function _dproject_form(&$node, $form_state) {
     $form['body_field'] = node_body_field($node, $type->body_label, $type->min_word_count);
   }
 
-  if (module_exists('content')) {
-    $form['short_name']['#weight'] = content_extra_field_weight('dproject', 'short_name');
-    $form['description']['#weight'] = content_extra_field_weight('dproject', 'description');
-  }
-
   return $form;
 }
 
