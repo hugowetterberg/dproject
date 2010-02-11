@@ -111,7 +111,7 @@ function _dproject_feed_generate($pid, $api_version) {
     }
     $release->appendChild($dom->createElement('status', $rel->getPublished()?'published':'unpublished'));
     // TODO: This release link doesn't point to anything. Implement it in the menu system.
-    $release->appendChild($dom->createElement('release_link', url('project/' . $node->short_name . '/releases/' . $rel->versionString(), array('absolute' => TRUE))));
+    $release->appendChild($dom->createElement('release_link', url('project/' . $node->short_name . '/releases/' . $rel->getId(), array('absolute' => TRUE))));
     $release->appendChild($dom->createElement('download_link', url($rel->getFilePath(), array('absolute' => TRUE))));
     $release->appendChild($dom->createElement('date', $rel->getCreated()));
     $release->appendChild($dom->createElementNS(DProject::NAMESPACE, 'iso_date', date('c', $rel->getCreated())));
