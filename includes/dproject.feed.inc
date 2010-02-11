@@ -42,7 +42,7 @@ function _dproject_feed_generate($pid, $api_version) {
   // Get the latest release to calculate mod-date and E-tag
   $modified = $node->changed;
   $latest_releases = $dp->getReleases($node, $api_version, 1);
-  if (!empty($latest_release)) {
+  if (!empty($latest_releases)) {
     $latest_release = $latest_releases[0];
     $modified = max($latest_release->getCreated(), $modified);
   }
