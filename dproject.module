@@ -45,6 +45,9 @@ function dproject_cron() {
   _dproject_cron();
 }
 
+/**
+ * Implementation of hook_perm().
+ */
 function dproject_perm() {
   return array('administer dproject');
 }
