@@ -601,7 +601,7 @@ class DProjectPackager {
     $metadata = $rel->getMetadataObject();
     $rel->setTracking($form['#tracking_release']);
 
-    if (!$rel->getTracking()) {
+    if (!$rel->isTracking()) {
       // Make changes in minor version number when necessary
       if ($values['version_extra'] == 'dev' || !DProject::isInt($values['minor_version']) || $values['minor_version']<0) {
         $values['minor_version'] = NULL;

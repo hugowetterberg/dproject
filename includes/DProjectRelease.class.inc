@@ -629,7 +629,7 @@ class DProjectRelease {
    * @return bool
    *  Whether the release should track it's source or not
    */
-  public function getTracking() {
+  public function isTracking() {
     return $this->tracking;
   }
 

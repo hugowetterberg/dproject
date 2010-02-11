@@ -333,7 +333,7 @@ function _dproject_confirm_project_release($form_state, $project, $packager, $ri
     ),
   );
 
-  if ($rel->getTracking()) {
+  if ($rel->isTracking()) {
     $form['tracking'] = array(
       '#type' => 'item',
       '#title' => t('Tracking'),
