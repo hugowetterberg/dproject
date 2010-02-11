@@ -86,7 +86,6 @@ function _dproject_feed_generate($pid, $api_version) {
   $supported = $dp->getSupportedMajorVersions($node, $api_version);
   if ($supported) {
     $project->appendChild($dom->createElement('supported_major', join(',', $supported)));
-    $project->appendChild($dom->createElement('default_major', min($supported)));
   }
 
   $project->appendChild($dom->createElement('project_status', $node->status?'published':'unpublished'));
