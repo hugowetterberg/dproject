@@ -53,6 +53,24 @@ function dproject_perm() {
 }
 
 /**
+ * Implementation of hook_theme().
+ */
+function dproject_theme() {
+  $base = array(
+    'path' => drupal_get_path('module', 'dproject') . '/theme',
+  );
+  return array(
+    'dproject_release_info' => array(
+      'template' => 'dproject_release_info',
+      'arguments' => array(
+        'release' => NULL,
+        'packager' => NULL,
+      ),
+    ) + $base,
+  );
+}
+
+/**
  * Implementation of hook_menu().
  */
 function dproject_menu() {
@@ -140,12 +158,15 @@ function dproject_menu() {
     'type' => MENU_CALLBACK,
   );
 
-  $items['project/%dprojectnode/releases/%'] = array(
+  $items['project/%dprojectnode/releases/%dprojectrelease'] = array(
     'title' => 'Release information',
+    'title callback' => 'dproject_release_title',
+    'title arguments' => array(3),
     'page callback' => '_dproject_release_information',
-    'page arguments' => array(1, 3),
+    'page arguments' => array(3),
     'access callback' => '_dproject_node_access',
     'access arguments' => array(1, 'view'),
+    'file' => 'includes/dproject.release.inc',
     'type' => MENU_CALLBACK,
   );
 
@@ -181,6 +202,16 @@ function dproject_menu() {
 }
 
 /**
+ * Menu system title callback for the release page.
+ *
+ * @param DProjectRelease $release 
+ * @return string
+ */
+function dproject_release_title($release) {
+  return $release->getProjectNode()->title . ' ' . $release->versionString();
+}
+
+/**
  * Menu system wildcard loader for %dprojectnode
  * allowing projects to be referenced by name
  *
@@ -200,6 +231,17 @@ function dprojectnode_load($short_name) {
  */
 function dprojectpackager_load($pid) {
   return DProjectPackager::load($pid);
+}
+
+/**
+ * Menu system wildcard loader for %dprojectrelease
+ * allowing releases to be referenced by id
+ *
+ * @param int $rid
+ * @return stdClass
+ */
+function dprojectrelease_load($rid) {
+  return DProjectRelease::load($rid);
 }
 
 /**
