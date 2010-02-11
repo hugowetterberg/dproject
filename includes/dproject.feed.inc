@@ -79,7 +79,7 @@ function _dproject_feed_generate($pid, $api_version) {
 
   $recommended = $dp->getRecommendedRelease($node, $api_version);
   if ($recommended) {
-    $rv = $recommended->get_version();
+    $rv = $recommended->getVersion();
     $project->appendChild($dom->createElement('recommended_major', $rv[1]));
   }
 
