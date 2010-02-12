@@ -66,7 +66,8 @@ function _datapoint_project_datapoint_parseresult($data, $source, &$res) {
 
       $metadata_elements = $release->getElementsByTagName('metadata');
       foreach ($metadata_elements as $meta) {
-        $data = json_decode($meta->nodeValue, TRUE);
+        // TODO: Metadata will be encoded as XML and has to be read accordingly
+        $data = unserialize($meta->nodeValue);
         _datapoint_project_add_metadata($metadata, $meta->prefix, $meta->namespaceURI, $data);
       }
 
@@ -76,11 +77,11 @@ function _datapoint_project_datapoint_parseresult($data, $source, &$res) {
           'tag' => $cvs_tag,
         ));
       }
-      $vertex->value('release_metadata', json_encode($metadata));
+      $vertex->value('release_metadata', serialize($metadata));
 
       // Get release terms
       $terms = $xpath->query('terms/term', $release);
-      $vertex->value('release_terms', json_encode(_datapoint_project_datapoint_parseterms($terms, $x)));
+      $vertex->value('release_terms', serialize(_datapoint_project_datapoint_parseterms($terms, $x)));
 
       //Add vertex
       $point->addVertex($vertex);

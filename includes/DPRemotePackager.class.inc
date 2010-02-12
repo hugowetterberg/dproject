@@ -129,7 +129,7 @@ class DPRemotePackager extends DProjectPackager implements dProjectUpdateablePac
     $rel->setPackager($this->getId());
 
     if ($vertex->release_metadata) {
-      $entries = json_decode($vertex->release_metadata);
+      $entries = unserialize($vertex->release_metadata);
       foreach ($entries as $name => $e) {
         $m = $rel->getMetadataObject($name, $e->namespace);
         foreach (get_object_vars($e->data) as $key => $value) {
@@ -149,7 +149,7 @@ class DPRemotePackager extends DProjectPackager implements dProjectUpdateablePac
     );
 
     // Decode release type terms
-    $release_terms = json_decode($vertex->release_terms);
+    $release_terms = unserialize($vertex->release_terms);
     $release_type = array();
     foreach ($release_terms as $term) {
       if ($term->name == 'Release type') {
@@ -367,7 +367,7 @@ class DPRemotePackager extends DProjectPackager implements dProjectUpdateablePac
     $this->configuration->datapoint_source = $sid;
     drupal_write_record('dproject_packager', $v=array(
       'pid' => $this->getId(),
-      'configuration' => json_encode($this->configuration),
+      'configuration' => serialize($this->configuration),
     ), array('pid'));
   }
 

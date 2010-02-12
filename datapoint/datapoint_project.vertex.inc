@@ -60,13 +60,15 @@ function datapoint_project_vertex_schema() {
         'default' => '',
       ),
       'release_terms' => array(
-        'description' => t('Terms describing the release encoded as json'),
+        'description' => t('Terms describing the release'),
         'type' => 'text',
+        'serialized' => TRUE,
         'size' => 'big',
       ),
       'release_metadata' => array(
-        'description' => t('Metadata describing the release encoded as json'),
+        'description' => t('Metadata describing the release'),
         'type' => 'text',
+        'serialized' => TRUE,
         'size' => 'big',
       ),
     ),

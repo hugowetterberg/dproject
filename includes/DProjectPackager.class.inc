@@ -298,8 +298,8 @@ class DProjectPackager {
    * @return void
    */
   protected function conf($name, $default=NULL) {
-    if (is_object($this->configuration) && isset($this->configuration->$name)) {
-      return $this->configuration->$name;
+    if (is_array($this->configuration) && isset($this->configuration[$name])) {
+      return $this->configuration[$name];
     }
     return $default;
   }
@@ -403,7 +403,7 @@ class DProjectPackager {
           'module' => $module,
           'name' => $error,
           'message' => $message,
-          'message_arguments' => json_encode($args),
+          'message_arguments' => serialize($args),
           'severity' => $severity,
         );
         drupal_write_record('dproject_packager_message', $data);
@@ -703,8 +703,8 @@ class DProjectPackager {
         return clone DProjectPackager::$loadedPackagers[$row['pid']];
       }
 
-      // Decode configuration json and get the packager declaration info
-      $row['configuration'] = json_decode($row['configuration']);
+      // Unserialize configuration and get the packager declaration info
+      $row['configuration'] = unserialize($row['configuration']);
       $ptype = $dp->getPackagerTypes($row['packager']);
       try {
         if ($ptype) {

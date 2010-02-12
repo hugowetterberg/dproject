@@ -156,7 +156,7 @@ function _dproject_project_packagers_submit($form, $form_state) {
   $values = array(
     'nid' => $values['project'],
     'packager' => $packager_type,
-    'configuration' => json_encode($configuration),
+    'configuration' => serialize($configuration),
   );
 
   drupal_write_record('dproject_packager', $values);

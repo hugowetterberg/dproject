@@ -111,7 +111,7 @@ class DProjectRelease {
     // Get the state as an array so that we can use DProjectRelease::__set_state to create the release object
     if ($state = db_fetch_array($res)) {
       // Decode the metadata and map it to the correct state key, unset the old value
-      $state['metadata'] = json_decode($state['release_metadata']);
+      $state['metadata'] = unserialize($state['release_metadata']);
       unset($state['release_metadata']);
 
       // Check provided $project node so that it matches the project nid
@@ -441,7 +441,7 @@ class DProjectRelease {
       'temporary' => $this->temporary,
       'file_path' => $this->file_path,
       'md5' => $this->md5,
-      'release_metadata' => json_encode($this->metadata),
+      'release_metadata' => serialize($this->metadata),
     );
 
     // Update if we got a release id
