@@ -158,7 +158,26 @@ function _dproject_feed_generate($pid, $api_version) {
 
 function _dproject_feed_add_metadata($dom, $release, $md) {
   $metadata = $release->appendChild($dom->createElementNS($md->namespace, $md->name . ':metadata'));
-  $metadata->appendChild($dom->createCDATASection(json_encode($md->data)));
+  _dproject_feed_add_metadata_children($dom, $metadata, $md, $md->data);
+}
+
+function _dproject_feed_add_metadata_children($dom, $element, $md, $children) {
+  foreach ($children as $name => $data) {
+    $ce = $element->appendChild($dom->createElementNS($md->namespace, $md->name . ':item'));
+    $ce->setAttribute('name', $name);
+    if (is_object($data) || is_array($data)) {
+      if (is_object($data)) {
+        $ce->setAttribute('type', 'object');
+      }
+      else if (is_array($data)) {
+        $ce->setAttribute('type', 'array');
+      }
+      _dproject_feed_add_metadata_children($dom, $ce, $md, $data);
+    }
+    else {
+      $ce->setAttribute('value', $data);
+    }
+  }
 }
 
 function _dproject_feed_add_term($dom, $terms, $value, $release_type=TRUE) {
