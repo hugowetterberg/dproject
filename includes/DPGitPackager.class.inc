@@ -40,7 +40,7 @@ class DPGitPackager extends DProjectPackager implements dProjectUpdateablePackag
    *  A description
    */
   public function getDescription() {
-    return '<strong>' . t('Origin') . ':</strong> ' . $this->configuration->url;
+    return '<strong>' . t('Origin') . ':</strong> ' . $this->configuration['url'];
   }
 
   /**
