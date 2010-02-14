@@ -56,7 +56,7 @@ class DPGitPackager extends DProjectPackager implements dProjectUpdateablePackag
 
     if ($git_info) {
       $wd = $this->workingDirectory();
-      $log = DPGitPackager::log($wd . '/.git', 1, $git_info->sha1, '.');
+      $log = DPGitPackager::log($wd, 1, $git_info->sha1, '.');
 
       $reference = $git_info->sha1;
       if (isset($git_info->reference)) {
@@ -160,7 +160,7 @@ class DPGitPackager extends DProjectPackager implements dProjectUpdateablePackag
     $metadata->origin = $this->conf('url');
 
     $wd = $this->workingDirectory();
-    $info = DPGitPackager::resolveReference($wd . '/.git', $reference);
+    $info = DPGitPackager::resolveReference($wd, $reference);
     $release->addFileAlter('DPGitPackager::expandKeywords');
     $release->addFileExclude('/\.git.*/');
 
@@ -188,7 +188,7 @@ class DPGitPackager extends DProjectPackager implements dProjectUpdateablePackag
 
       $out = array();
       $return = 0;
-      $cmd = DPGitPackager::gitShellCommand('clone "' . $this->conf('url') . '" "' . $wdir . '"');
+      $cmd = DPGitPackager::gitShellCommand('clone --mirror "' . $this->conf('url') . '" "' . $wdir . '"');
       exec($cmd, $out, $return);
 
       if ($return === 0) {
@@ -234,7 +234,7 @@ class DPGitPackager extends DProjectPackager implements dProjectUpdateablePackag
     $metadata = $release->getMetadataObject('git', DPGitPackager::GIT_NAMESPACE);
 
     $out = array();
-    $res = DPGitPackager::checkout($target, $repo . '/.git', $metadata->sha1, $out);
+    $res = DPGitPackager::checkout($target, $repo, $metadata->sha1, $out);
     if (!$res) {
       $this->setMessage('dpgit', 'packaging', 'Failed to check out !sha1 to the directory !dir', array(
         '!sha1' => $metadata->sha1,
@@ -280,7 +280,7 @@ class DPGitPackager extends DProjectPackager implements dProjectUpdateablePackag
    */
   public function referenceSha1($reference) {
     $wd = $this->workingDirectory();
-    $info = DPGitPackager::resolveReference($wd . '/.git', $reference);
+    $info = DPGitPackager::resolveReference($wd, $reference);
     return $info ? $info['sha1'] : FALSE;
   }
 
@@ -294,11 +294,11 @@ class DPGitPackager extends DProjectPackager implements dProjectUpdateablePackag
    */
   public static function branches($repository) {
     $branches = array();
-    $out = shell_exec(DPGitPackager::gitShellCommand('branch -r --no-color', $repository));
+    $out = shell_exec(DPGitPackager::gitShellCommand('branch --no-color', $repository));
 
     foreach (split("\n", $out) as $line) {
       if (!empty($line)) {
-        $branches[] = trim($line);
+        $branches[] = substr($line, 2);
       }
     }
 
@@ -462,7 +462,7 @@ class DPGitPackager extends DProjectPackager implements dProjectUpdateablePackag
     if (file_exists($wdir)) {
       $out = array();
       $return = 0;
-      $cmd = DPGitPackager::gitShellCommand('fetch origin', $wdir . '/.git');
+      $cmd = DPGitPackager::gitShellCommand('fetch origin', $wdir);
       exec($cmd, $out, $return);
 
       if ($return === 0) {
@@ -552,7 +552,7 @@ class DPGitPackager extends DProjectPackager implements dProjectUpdateablePackag
   public function tagsOptions() {
     $wdir = $this->workingDirectory();
     $options = array();
-    foreach (DPGitPackager::tags($wdir . '/.git') as $tag) {
+    foreach (DPGitPackager::tags($wdir) as $tag) {
       $options['tags/' . $tag] = $tag;
     }
     return $options;
@@ -567,8 +567,8 @@ class DPGitPackager extends DProjectPackager implements dProjectUpdateablePackag
   public function branchesOptions() {
     $wdir = $this->workingDirectory();
     $options = array();
-    foreach (DPGitPackager::branches($wdir . '/.git') as $branch) {
-      $options['refs/remotes/' . $branch] = $branch;
+    foreach (DPGitPackager::branches($wdir) as $branch) {
+      $options['refs/heads/' . $branch] = $branch;
     }
     return $options;
   }
@@ -581,7 +581,7 @@ class DPGitPackager extends DProjectPackager implements dProjectUpdateablePackag
    */
   public function recentCommitsOptions() {
     $wdir = $this->workingDirectory();
-    $log = DPGitPackager::log($wdir . '/.git', 20, 'origin/master');
+    $log = DPGitPackager::log($wdir, 20, 'origin/master');
 
     $recent_commits = array();
     foreach ($log as $sha1 => $info) {
