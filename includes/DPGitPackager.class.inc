@@ -12,7 +12,7 @@
  * @package dpgit
  */
 class DPGitPackager extends DProjectPackager implements dProjectUpdateablePackager {
-  const NAMESPACE = 'http://goodold.se/project/dproject/dpgit';
+  const GIT_NAMESPACE = 'http://goodold.se/project/dproject/dpgit';
 
   /**
    * Gets the the type name of the packager
@@ -52,7 +52,7 @@ class DPGitPackager extends DProjectPackager implements dProjectUpdateablePackag
    *  The description of the source
    */
   public function getSourceDescription($release) {
-    $git_info = $release->getMetadataObject('git', DPGitPackager::NAMESPACE);
+    $git_info = $release->getMetadataObject('git', DPGitPackager::GIT_NAMESPACE);
 
     if ($git_info) {
       $wd = $this->workingDirectory();
@@ -156,7 +156,7 @@ class DPGitPackager extends DProjectPackager implements dProjectUpdateablePackag
    * @return void
    */
   public function configureRelease(&$release, $reference) {
-    $metadata = $release->getMetadataObject('git', DPGitPackager::NAMESPACE);
+    $metadata = $release->getMetadataObject('git', DPGitPackager::GIT_NAMESPACE);
     $metadata->origin = $this->conf('url');
 
     $wd = $this->workingDirectory();
@@ -231,7 +231,7 @@ class DPGitPackager extends DProjectPackager implements dProjectUpdateablePackag
   public function package($release) {
     $repo = $this->workingDirectory();
     $target = $this->workingDirectory($release);
-    $metadata = $release->getMetadataObject('git', DPGitPackager::NAMESPACE);
+    $metadata = $release->getMetadataObject('git', DPGitPackager::GIT_NAMESPACE);
 
     $out = array();
     $res = DPGitPackager::checkout($target, $repo . '/.git', $metadata->sha1, $out);
@@ -535,7 +535,7 @@ class DPGitPackager extends DProjectPackager implements dProjectUpdateablePackag
       'php' => TRUE,
     );
     if (isset($ext[$path_info['extension']])) {
-      $metadata = $release->getMetadataObject('git', DPGitPackager::NAMESPACE);
+      $metadata = $release->getMetadataObject('git', DPGitPackager::GIT_NAMESPACE);
       $id_kw = '$Id: ' . $path_info['basename'] . ', sha1: ' . $metadata->sha1 . ' ' .
         date('c', strtotime($metadata->info->header->date)) . ' ' . $metadata->info->header->author . ' Exp $';
       $count = 0;
